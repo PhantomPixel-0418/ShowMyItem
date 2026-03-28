@@ -1,5 +1,8 @@
 name: Publish to Modrinth
 
+permissions:
+  contents: write
+
 on:
   push:
     tags:
@@ -18,8 +21,9 @@ jobs:
         if: github.event_name == 'push'
         uses: ncipollo/release-action@v1
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           body: "Automatically generated release for tag ${{ github.ref_name }}"
           draft: false
           prerelease: false

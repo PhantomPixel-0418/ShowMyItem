@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "showmyitem",
+  "version": "${version}",
+  "name": "Show My Item",
+  "description": "Show your item in chat by sending '[item]' and hover to see details.",
+  "authors": ["PhantomPixel-0418"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/showmyitem/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.PhantomPixel0418.showmyitem.Showmyitem"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}",
+    "java": ">=${java_version}"
+  }
+}

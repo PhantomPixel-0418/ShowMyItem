@@ -1,0 +1,35 @@
+name: Publish to Modrinth
+
+on:
+  release:
+    types: [published]  # 创建 Release 时触发
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Build with Gradle
+        run: ./gradlew clean build
+
+      - name: Upload to Modrinth
+        uses: cloudnode-pro/modrinth-publish@v2
+        with:
+          token: ${{ secrets.MODRINTH_TOKEN }}
+          project: "pMKJZtiq"
+          name: Show My Item ${{ github.event.release.tag_name }}
+          version: ${{ github.event.release.tag_name }}
+          changelog: ${{ github.event.release.body }}
+          loaders: |
+            fabric
+          game-versions: |
+            1.21.4
+          files: build/libs/showmyitem-*.jar

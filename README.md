@@ -166,7 +166,7 @@
 
 ## 许可证
 
-基于 MIT 许可证分发。详见 `[LICENSE](/LICENSE)` 文件。
+基于 MIT 许可证分发。详见 [LICENSE](/LICENSE) 文件。
 
 <p align="right">(<a href="#top">回到顶部</a>)</p>
 

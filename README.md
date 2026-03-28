@@ -1,7 +1,7 @@
 <!-- 项目徽章（可根据实际替换链接和图片） -->
 <div align="center">
   <a href="https://github.com/PhantomPixel-0418/ShowMyItem">
-    <img src="src\main\assets\showmyitem\icon.png" alt="Logo" width="80" height="80">
+    <img src="https://github.com/PhantomPixel-0418/ShowMyItem/blob/master/src/main/assets/showmyitem/icon.png?raw=true" alt="Logo" width="80" height="80">
   </a>
 
   <h3 align="center">Show My Item</h3>
@@ -13,6 +13,8 @@
     <br />
     <br />
     <a href="https://modrinth.com/mod/showmyitem">查看 Modrinth 页面</a>
+    ·
+    <a href="https://github.com/PhantomPixel-0418/ShowMyItem">查看 Github 页面</a>
     ·
     <a href="https://github.com/PhantomPixel-0418/ShowMyItem/issues">报告 Bug</a>
     ·
@@ -46,7 +48,7 @@
 
 ## 关于项目
 
-![Show My Item 截图](images/screenshot.png)
+![Show My Item 截图](https://github.com/PhantomPixel-0418/ShowMyItem/blob/master/images/screenshot.png?raw=true)
 
 **Show My Item** 是一个轻量级的 Minecraft Fabric 模组，为聊天增加了一个有趣的小功能：当你在聊天中输入 `[item]` 时，它会自动替换为你手中持有的物品名称，并且其他玩家将鼠标悬停在该名称上时，可以**直接看到该物品的完整详情**（名称、附魔、耐久等）。
 

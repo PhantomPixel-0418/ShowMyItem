@@ -17,7 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # 需要完整历史以比较 tag
+          fetch-depth: 0   # 获取完整历史以比较 tag
 
       - name: Set Modrinth version variables from commit
         env:
@@ -49,16 +49,13 @@ jobs:
           echo "MODRINTH_VERSION=$MODRINTH_VERSION" >> $GITHUB_ENV
         shell: bash
 
-      # 智能分类生成 changelog
       - name: Generate changelog from commits
-        id: changelog
         run: |
           python3 << 'EOF'
           import os, subprocess, re
           from collections import defaultdict
 
           current_tag = os.environ['GITHUB_REF_NAME']
-          # 获取上一个 tag
           try:
               prev_tag = subprocess.check_output(['git', 'describe', '--tags', '--abbrev=0', f'{current_tag}^'], stderr=subprocess.DEVNULL).decode().strip()
           except subprocess.CalledProcessError:
@@ -69,11 +66,9 @@ jobs:
           else:
               commit_range = "HEAD"
 
-          # 获取提交列表: 消息|作者|hash
           output = subprocess.check_output(['git', 'log', '--pretty=format:%s|%an|%H', commit_range]).decode().strip()
           commits = [line.split('|', 2) for line in output.split('\n')] if output else []
 
-          # 分类映射
           categories = {
               'feat': ('✨ 新功能', []),
               'fix': ('🐛 Bug 修复', []),
@@ -90,9 +85,10 @@ jobs:
           repo = os.environ['GITHUB_REPOSITORY']
           repo_url = f"https://github.com/{repo}"
 
-          for msg, author, hash_val in commits:
-              # 提取类型前缀
-              m = re.match(r'^([a-z]+):\s*(.*)', msg)
+          for full_msg, author, hash_val in commits:
+              msg = full_msg.strip()
+              # 匹配类型，支持括号，例如 feat(ci): 或 fix:
+              m = re.match(r'^([a-z]+)(?:\([^)]+\))?:\s*(.*)', msg)
               if m:
                   typ = m.group(1)
                   rest = m.group(2)
@@ -108,8 +104,7 @@ jobs:
               else:
                   pr = None
 
-              # 构建条目
-              entry = f"- {rest} by **{author}**"
+              entry = f"- {rest} by **@{author}**"
               if pr:
                   entry += f" in [#{pr}]({repo_url}/pull/{pr})"
 
@@ -118,7 +113,6 @@ jobs:
               else:
                   other.append(entry)
 
-          # 构建最终 changelog
           changelog = f"## Changes in {current_tag}\n\n"
           for typ, (title, entries) in categories.items():
               if entries:
@@ -128,7 +122,6 @@ jobs:
           if not changelog.strip():
               changelog = f"## Changes in {current_tag}\n\n- No changes recorded"
 
-          # 写入环境变量
           with open(os.environ['GITHUB_ENV'], 'a') as f:
               f.write(f"CHANGELOG<<EOF\n{changelog}\nEOF\n")
           EOF

@@ -17,9 +17,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set Modrinth game versions from commit
+      - name: Set Modrinth version variables from commit
         env:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
+          TAG_NAME: ${{ github.ref_name }}
         run: |
           DEFAULT_GAME_VERSIONS='1.21.4'
           GAME_VERSIONS=$(printf '%s\n' "$COMMIT_MSG" \
@@ -31,14 +32,19 @@ jobs:
           if [ -n "$GAME_VERSIONS" ]; then
             echo "Detected game versions from commit:"
             printf '%s\n' "$GAME_VERSIONS"
-            {
-              printf 'GAME_VERSIONS<<EOF\n'
-              printf '%s\n' "$GAME_VERSIONS"
-              printf 'EOF\n'
-            } >> $GITHUB_ENV
           else
-            echo "GAME_VERSIONS=$DEFAULT_GAME_VERSIONS" >> $GITHUB_ENV
+            GAME_VERSIONS="$DEFAULT_GAME_VERSIONS"
+            echo "Using default game version: $GAME_VERSIONS"
           fi
+          PRIMARY_GAME_VERSION=$(printf '%s\n' "$GAME_VERSIONS" | head -n1 | tr -d '[:space:]')
+          UNPREFIXED_TAG=${TAG_NAME#v}
+          MODRINTH_VERSION="${UNPREFIXED_TAG}+${PRIMARY_GAME_VERSION}fabric"
+          {
+            printf 'GAME_VERSIONS<<EOF\n'
+            printf '%s\n' "$GAME_VERSIONS"
+            printf 'EOF\n'
+          } >> $GITHUB_ENV
+          echo "MODRINTH_VERSION=$MODRINTH_VERSION" >> $GITHUB_ENV
         shell: bash
 
       - name: Set up JDK 21
@@ -52,7 +58,14 @@ jobs:
 
       - name: Find built JAR
         run: |
-          echo "RELEASE_JAR=$(find build/libs -maxdepth 1 -type f -name '*.jar' | head -n 1)" >> $GITHUB_ENV
+          ROOT_JAR=$(find build/libs -maxdepth 1 -type f -name '*.jar' | head -n 1)
+          if [ -z "$ROOT_JAR" ]; then
+            echo "No JAR file found in build/libs" >&2
+            exit 1
+          fi
+          NEW_NAME="showmyitem-${MODRINTH_VERSION}.jar"
+          cp "$ROOT_JAR" "build/libs/$NEW_NAME"
+          echo "RELEASE_JAR=build/libs/$NEW_NAME" >> $GITHUB_ENV
           ls -al build/libs
         shell: bash
 
@@ -82,7 +95,7 @@ jobs:
           token: ${{ secrets.MODRINTH_TOKEN }}
           project: "pMKJZtiq"
           name: Show My Item ${{ github.event.release.tag_name || github.ref_name }}
-          version: ${{ github.event.release.tag_name || github.ref_name }}
+          version: ${{ env.MODRINTH_VERSION }}
           changelog: ${{ github.event.release.body || format('Release created from tag {0}', github.ref_name) }}
           loaders: fabric
           game-versions: ${{ env.GAME_VERSIONS }}

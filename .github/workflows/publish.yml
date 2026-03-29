@@ -22,10 +22,20 @@ jobs:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: |
           DEFAULT_GAME_VERSIONS='1.21.4'
-          GAME_VERSIONS=$(printf '%s\n' "$COMMIT_MSG" | grep -iEo 'game-versions:[[:space:]]*.*' | sed -E 's/^[Gg]ame-versions:[[:space:]]*//')
+          GAME_VERSIONS=$(printf '%s\n' "$COMMIT_MSG" \
+            | grep -iEo 'game-versions:[[:space:]]*.*' \
+            | sed -E 's/^[Gg]ame-versions:[[:space:]]*//' \
+            | tr ',' '\n' \
+            | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' \
+            | grep -v '^$')
           if [ -n "$GAME_VERSIONS" ]; then
-            echo "Detected game versions from commit: $GAME_VERSIONS"
-            echo "GAME_VERSIONS=$GAME_VERSIONS" >> $GITHUB_ENV
+            echo "Detected game versions from commit:"
+            printf '%s\n' "$GAME_VERSIONS"
+            {
+              printf 'GAME_VERSIONS<<EOF\n'
+              printf '%s\n' "$GAME_VERSIONS"
+              printf 'EOF\n'
+            } >> $GITHUB_ENV
           else
             echo "GAME_VERSIONS=$DEFAULT_GAME_VERSIONS" >> $GITHUB_ENV
           fi

@@ -6,9 +6,9 @@ permissions:
 on:
   push:
     tags:
-      - 'v*'                # 推送标签时触发
+      - 'v*'
   release:
-    types: [published]     # 已发布 Release 时也触发
+    types: [published]
 
 jobs:
   publish:
@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 需要完整历史以比较 tag
 
       - name: Set Modrinth version variables from commit
         env:
@@ -47,6 +49,101 @@ jobs:
           echo "MODRINTH_VERSION=$MODRINTH_VERSION" >> $GITHUB_ENV
         shell: bash
 
+      # 智能分类生成 changelog
+      - name: Generate changelog from commits
+        id: changelog
+        run: |
+          python3 << 'EOF'
+          import os, subprocess, re
+          from collections import defaultdict
+
+          current_tag = os.environ['GITHUB_REF_NAME']
+          # 获取上一个 tag
+          try:
+              prev_tag = subprocess.check_output(['git', 'describe', '--tags', '--abbrev=0', f'{current_tag}^'], stderr=subprocess.DEVNULL).decode().strip()
+          except subprocess.CalledProcessError:
+              prev_tag = None
+
+          if prev_tag:
+              commit_range = f"{prev_tag}..{current_tag}"
+          else:
+              commit_range = "HEAD"
+
+          # 获取提交列表: 消息|作者|hash
+          output = subprocess.check_output(['git', 'log', '--pretty=format:%s|%an|%H', commit_range]).decode().strip()
+          commits = [line.split('|', 2) for line in output.split('\n')] if output else []
+
+          # 分类映射
+          categories = {
+              'feat': ('✨ 新功能', []),
+              'fix': ('🐛 Bug 修复', []),
+              'docs': ('📝 文档', []),
+              'style': ('💄 样式', []),
+              'refactor': ('♻️ 重构', []),
+              'perf': ('⚡ 性能优化', []),
+              'test': ('✅ 测试', []),
+              'chore': ('🔧 杂务', []),
+              'build': ('📦 构建', []),
+          }
+          other = []
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          repo_url = f"https://github.com/{repo}"
+
+          for msg, author, hash_val in commits:
+              # 提取类型前缀
+              m = re.match(r'^([a-z]+):\s*(.*)', msg)
+              if m:
+                  typ = m.group(1)
+                  rest = m.group(2)
+              else:
+                  typ = None
+                  rest = msg
+
+              # 提取 PR/issue 引用 (例如 (#123))
+              pr_match = re.search(r'\(#(\d+)\)$', rest)
+              if pr_match:
+                  pr = pr_match.group(1)
+                  rest = re.sub(r'\s*\(#\d+\)$', '', rest)
+              else:
+                  pr = None
+
+              # 构建条目
+              entry = f"- {rest} by **{author}**"
+              if pr:
+                  entry += f" in [#{pr}]({repo_url}/pull/{pr})"
+
+              if typ and typ in categories:
+                  categories[typ][1].append(entry)
+              else:
+                  other.append(entry)
+
+          # 构建最终 changelog
+          changelog = f"## Changes in {current_tag}\n\n"
+          for typ, (title, entries) in categories.items():
+              if entries:
+                  changelog += f"### {title}\n" + "\n".join(entries) + "\n\n"
+          if other:
+              changelog += "### 📌 其他\n" + "\n".join(other) + "\n\n"
+          if not changelog.strip():
+              changelog = f"## Changes in {current_tag}\n\n- No changes recorded"
+
+          # 写入环境变量
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f"CHANGELOG<<EOF\n{changelog}\nEOF\n")
+          EOF
+        shell: bash
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -54,7 +151,7 @@ jobs:
           distribution: temurin
 
       - name: Build with Gradle
-        run: gradle clean build
+        run: chmod +x gradlew && ./gradlew clean build
 
       - name: Find built JAR
         run: |
@@ -77,7 +174,7 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          body: "Automatically generated release for tag ${{ github.ref_name }}"
+          body: ${{ env.CHANGELOG }}
           draft: false
           prerelease: false
           files: ${{ env.RELEASE_JAR }}
@@ -100,7 +197,7 @@ jobs:
           project: "pMKJZtiq"
           name: Show My Item ${{ github.event.release.tag_name || github.ref_name }}
           version: ${{ env.MODRINTH_VERSION }}
-          changelog: ${{ github.event.release.body || format('Release created from tag {0}', github.ref_name) }}
+          changelog: ${{ env.CHANGELOG }}
           loaders: fabric
           game-versions: ${{ env.GAME_VERSIONS }}
           files: ${{ env.RELEASE_JAR }}

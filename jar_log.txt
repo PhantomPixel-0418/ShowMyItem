@@ -1,0 +1,109 @@
+﻿Initialized native services in: C:\Users\zhang\.gradle\native
+Initialized jansi services in: C:\Users\zhang\.gradle\native
+The client will now receive all logging from the daemon (pid: 68728). The daemon log file: C:\Users\zhang\.gradle\daemon\9.4.1\daemon-68728.out.log
+Starting 4th build in daemon [uptime: 2 mins 51.88 secs, performance: 99%, GC rate: 0.03/s, heap usage: 23% of 512 MiB, non-heap usage: 28% of 384 MiB]
+Using 16 worker leases.
+Operational build model parameters: {cachingModelBuilding=false, configurationCache=false, configurationCacheDisabledReason=null, configurationCacheParallelLoad=false, configurationCacheParallelStore=false, configureOnDemand=false, invalidateCoupledProjects=false, isolatedProjects=false, modelAsProjectDependency=false, modelBuilding=false, parallelModelBuilding=false, parallelProjectConfiguration=false, parallelProjectExecution=false, resilientModelBuilding=false}
+Now considering [D:\HuaweiMoveData\Users\zhang\Documents\GitHub\ShowMyItem] as hierarchies to watch
+Watching the file system is configured to be enabled if available
+File system watching is active
+Starting Build
+Settings evaluated using settings file 'D:\HuaweiMoveData\Users\zhang\Documents\GitHub\ShowMyItem\settings.gradle'.
+Projects loaded. Root project using build file 'D:\HuaweiMoveData\Users\zhang\Documents\GitHub\ShowMyItem\build.gradle'.
+Included projects: [root project 'ShowMyItem']
+
+> Configure project :
+Evaluating root project 'ShowMyItem' using build file 'D:\HuaweiMoveData\Users\zhang\Documents\GitHub\ShowMyItem\build.gradle'.
+Resolved plugin [id: 'fabric-loom', version: '1.8.10']
+Resolved plugin [id: 'maven-publish']
+Fabric Loom: 1.8.10
+(kotlinx.metadata.jvm.KotlinClassMetadata) with version (0.9.0-1.9.21-40) was loaded from (/C:/Users/zhang/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-metadata-jvm/0.9.0/123e86fd82d3a49afd0a41df1288a40c969f11b2/kotlinx-metadata-jvm-0.9.0.jar)
+(org.objectweb.asm.ClassVisitor) with version (9.7.1) was loaded from (/C:/Users/zhang/.gradle/caches/modules-2/files-2.1/org.ow2.asm/asm/9.7.1/f0ed132a49244b042cd0e15702ab9f2ce3cc8436/asm-9.7.1.jar)
+(org.objectweb.asm.tree.analysis.Analyzer) with version (9.7.1) was loaded from (/C:/Users/zhang/.gradle/caches/modules-2/files-2.1/org.ow2.asm/asm-analysis/9.7.1/f97a3b319f0ed6a8cd944dc79060d3912a28985f/asm-analysis-9.7.1.jar)
+(org.objectweb.asm.commons.ClassRemapper) with version (9.7.1) was loaded from (/C:/Users/zhang/.gradle/caches/modules-2/files-2.1/org.ow2.asm/asm-commons/9.7.1/406c6a2225cfe1819f102a161e54cc16a5c24f75/asm-commons-9.7.1.jar)
+(org.objectweb.asm.tree.ClassNode) with version (9.7.1) was loaded from (/C:/Users/zhang/.gradle/caches/modules-2/files-2.1/org.ow2.asm/asm-tree/9.7.1/3a53139787663b139de76b627fca0084ab60d32c/asm-tree-9.7.1.jar)
+(org.objectweb.asm.util.ASMifier) with version (9.7.1) was loaded from (/C:/Users/zhang/.gradle/caches/modules-2/files-2.1/org.ow2.asm/asm-util/9.7.1/9e23359b598ec6b74b23e53110dd5c577adf2243/asm-util-9.7.1.jar)
+(com.google.gson.Gson) with version (null) was loaded from (/C:/Users/zhang/.gradle/caches/modules-2/files-2.1/com.google.code.gson/gson/2.10.1/b3add478d4382b78ea20b1671390a858002feb6c/gson-2.10.1.jar)
+(com.google.common.base.Preconditions) with version (null) was loaded from (/C:/Users/zhang/.gradle/caches/modules-2/files-2.1/com.google.guava/guava/33.0.0-jre/161ba27964a62f241533807a46b8711b13c1d94b/guava-33.0.0-jre.jar)
+(org.apache.commons.io.FileUtils) with version (2.15.1) was loaded from (/C:/Users/zhang/.gradle/caches/modules-2/files-2.1/commons-io/commons-io/2.15.1/f11560da189ab563a5c8e351941415430e9304ea/commons-io-2.15.1.jar)
+:setting up loom dependencies
+Applying installer data from C:\Users\zhang\.gradle\caches\modules-2\files-2.1\net.fabricmc\fabric-loader\0.16.10\dbd932c2a3641d2c41cf9abfe47e140a5753fa86\fabric-loader-0.16.10.jar
+Found another installer JSON in (C:\Users\zhang\.gradle\caches\modules-2\files-2.1\net.fabricmc\fabric-loader\0.16.10\dbd932c2a3641d2c41cf9abfe47e140a5753fa86\fabric-loader-0.16.10.jar), ignoring
+Could not find refmap definition, will be using default name: showmyitem-refmap.json
+Configuring compiler arguments for Java
+Adding mixin to classpath of AP config: annotationProcessor
+Adding mixin to classpath of AP config: testAnnotationProcessor
+Could not find refmap definition, will be using default name: showmyitem-refmap.json
+sourcesJar task was not found, not remapping sources
+All projects evaluated.
+Task name matched 'clean'
+Task name matched 'jar'
+Selected primary task 'clean' from project :
+Selected primary task 'jar' from project :
+Tasks to be executed: [task ':clean', task ':compileJava', task ':processResources', task ':classes', task ':jar']
+Tasks that were excluded: []
+Resolve mutations for :clean (Thread[#357,Execution worker,5,main]) started.
+:clean (Thread[#366,Execution worker Thread 10,5,main]) started.
+destroyer locations for task group 0 (Thread[#368,Execution worker Thread 12,5,main]) started.
+
+> Task :clean
+Caching disabled for task ':clean' because:
+  Build cache is disabled
+Task ':clean' is not up-to-date because:
+  Task has not declared any outputs despite executing actions.
+Resolve mutations for :compileJava (Thread[#366,Execution worker Thread 10,5,main]) started.
+:compileJava (Thread[#366,Execution worker Thread 10,5,main]) started.
+
+> Task :compileJava
+Caching disabled for task ':compileJava' because:
+  Build cache is disabled
+Task ':compileJava' is not up-to-date because:
+  Output property 'destinationDirectory' file D:\HuaweiMoveData\Users\zhang\Documents\GitHub\ShowMyItem\build\classes\java\main has been removed.
+  Output property 'destinationDirectory' file D:\HuaweiMoveData\Users\zhang\Documents\GitHub\ShowMyItem\build\classes\java\main\com has been removed.
+  Output property 'destinationDirectory' file D:\HuaweiMoveData\Users\zhang\Documents\GitHub\ShowMyItem\build\classes\java\main\com\PhantomPixel0418 has been removed.
+  and more...
+The input changes require a full rebuild for incremental task ':compileJava'.
+Compilation mode: in-process compilation
+Full recompilation is required because no incremental change information is available. This is usually caused by clean builds or changing compiler arguments.
+Compiling with toolchain 'D:\Program Files\Java\jdk-21'.
+Compiling with JDK Java compiler API.
+Class dependency analysis for incremental compilation took 0.001 secs.
+Created classpath snapshot for incremental compilation in 0.018 secs.
+Resolve mutations for :processResources (Thread[#366,Execution worker Thread 10,5,main]) started.
+:processResources (Thread[#366,Execution worker Thread 10,5,main]) started.
+
+> Task :processResources
+Caching disabled for task ':processResources' because:
+  Build cache is disabled
+  Not worth caching
+Task ':processResources' is not up-to-date because:
+  Output property 'destinationDir' file D:\HuaweiMoveData\Users\zhang\Documents\GitHub\ShowMyItem\build\resources\main has been removed.
+  Output property 'destinationDir' file D:\HuaweiMoveData\Users\zhang\Documents\GitHub\ShowMyItem\build\resources\main\assets has been removed.
+  Output property 'destinationDir' file D:\HuaweiMoveData\Users\zhang\Documents\GitHub\ShowMyItem\build\resources\main\assets\showmyitem has been removed.
+  and more...
+Resolve mutations for :classes (Thread[#366,Execution worker Thread 10,5,main]) started.
+:classes (Thread[#366,Execution worker Thread 10,5,main]) started.
+
+> Task :classes
+Skipping task ':classes' as it has no actions.
+Resolve mutations for :jar (Thread[#366,Execution worker Thread 10,5,main]) started.
+:jar (Thread[#366,Execution worker Thread 10,5,main]) started.
+
+> Task :jar
+Caching disabled for task ':jar' because:
+  Build cache is disabled
+  Not worth caching
+Task ':jar' is not up-to-date because:
+  No history is available.
+
+[Incubating] Problems report is available at: file:///D:/HuaweiMoveData/Users/zhang/Documents/GitHub/ShowMyItem/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.4.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 2s
+4 actionable tasks: 4 executed
+Watched directory hierarchies: [D:\HuaweiMoveData\Users\zhang\Documents\GitHub\ShowMyItem]

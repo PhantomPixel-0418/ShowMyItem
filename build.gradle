@@ -36,3 +36,34 @@ processResources {
         expand project.properties
     }
 }
+
+// 确保 jar 任务生成正确的 dev jar
+tasks.jar {
+    dependsOn compileJava, processResources
+    from compileJava.destinationDirectory
+    from processResources.destinationDir
+    from(rootProject.file("LICENSE")) {
+        rename { "${it}_${project.base.archivesName}" }
+    }.onlyIf { rootProject.file("LICENSE").exists() }
+    manifest {
+        attributes(
+                'Specification-Title': project.name,
+                'Specification-Vendor': project.findProperty('vendor') ?: 'Unknown',
+                'Specification-Version': project.version,
+                'Implementation-Title': project.name,
+                'Implementation-Version': project.version,
+                'Implementation-Vendor': project.findProperty('vendor') ?: 'Unknown'
+        )
+    }
+    destinationDirectory = file("${buildDir}/devlibs")
+    archiveBaseName = project.base.archivesName
+    archiveVersion = project.version
+}
+
+// 显式配置 remapJar，指定输入文件
+tasks.remapJar {
+    dependsOn tasks.jar
+    inputFile = tasks.jar.archiveFile.get().asFile
+    // 可选：指定输出目录（默认就是 build/libs）
+    destinationDirectory = file("${buildDir}/libs")
+}

@@ -26,6 +26,12 @@ jobs:
       - name: Build with Gradle
         run: gradle clean build
 
+      - name: Find built JAR
+        run: |
+          echo "RELEASE_JAR=$(find build/libs -maxdepth 1 -type f -name '*.jar' | head -n 1)" >> $GITHUB_ENV
+          ls -al build/libs
+        shell: bash
+
       - name: Create GitHub Release from tag and upload JAR
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v1
@@ -33,7 +39,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           body: "Automatically generated release for tag ${{ github.ref_name }}"
-          files: build/libs/showmyitem-*.jar
+          files: ${{ env.RELEASE_JAR }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -41,7 +47,7 @@ jobs:
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v1
         with:
-          files: build/libs/showmyitem-*.jar
+          files: ${{ env.RELEASE_JAR }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -57,4 +63,4 @@ jobs:
             fabric
           game-versions: |
             1.21.4
-          files: build/libs/showmyitem-*.jar
+          files: ${{ env.RELEASE_JAR }}

@@ -17,7 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # 获取完整历史以比较 tag
+          fetch-depth: 0
 
       - name: Set Modrinth version variables from commit
         env:
@@ -87,7 +87,6 @@ jobs:
 
           for full_msg, author, hash_val in commits:
               msg = full_msg.strip()
-              # 匹配类型，支持括号，例如 feat(ci): 或 fix:
               m = re.match(r'^([a-z]+)(?:\([^)]+\))?:\s*(.*)', msg)
               if m:
                   typ = m.group(1)
@@ -96,7 +95,6 @@ jobs:
                   typ = None
                   rest = msg
 
-              # 提取 PR/issue 引用 (例如 (#123))
               pr_match = re.search(r'\(#(\d+)\)$', rest)
               if pr_match:
                   pr = pr_match.group(1)
@@ -146,15 +144,48 @@ jobs:
       - name: Build with Gradle
         run: chmod +x gradlew && ./gradlew clean build
 
-      - name: Find built JAR
+      - name: Fix remapJar (fallback to dev.jar if empty)
         run: |
-          ROOT_JAR=$(find build/libs -maxdepth 1 -type f -name '*.jar' | grep -vE '(-sources|-javadoc|\.module\.jar)$' | sort | head -n 1)
-          if [ -z "$ROOT_JAR" ]; then
-            echo "No JAR file found in build/libs" >&2
-            exit 1
+          # 检查最终 JAR 的大小
+          FINAL_JAR=$(find build/libs -maxdepth 1 -type f -name '*.jar' | grep -vE '(-sources|-javadoc|\.module\.jar)$' | sort | head -n 1)
+          if [ -z "$FINAL_JAR" ]; then
+            echo "No final JAR found, will use dev.jar if available."
+            echo "USE_DEV_JAR=true" >> $GITHUB_ENV
+          else
+            # 获取文件大小（兼容 Linux 和 macOS）
+            if command -v stat >/dev/null 2>&1; then
+              JAR_SIZE=$(stat -c%s "$FINAL_JAR" 2>/dev/null || stat -f%z "$FINAL_JAR" 2>/dev/null)
+            else
+              JAR_SIZE=$(wc -c < "$FINAL_JAR" | tr -d ' ')
+            fi
+            if [ "$JAR_SIZE" -lt 1024 ]; then
+              echo "Final JAR too small ($JAR_SIZE bytes), will use dev.jar."
+              echo "USE_DEV_JAR=true" >> $GITHUB_ENV
+            else
+              echo "Final JAR size OK ($JAR_SIZE bytes)."
+              echo "USE_DEV_JAR=false" >> $GITHUB_ENV
+            fi
           fi
-          echo "Selected JAR: $ROOT_JAR"
-          jar tf "$ROOT_JAR" | sed -n '1,80p'
+        shell: bash
+
+      - name: Find built JAR (use dev.jar if needed)
+        run: |
+          if [ "$USE_DEV_JAR" = "true" ]; then
+            DEV_JAR=$(find build/devlibs -maxdepth 1 -type f -name '*.jar' | head -n 1)
+            if [ -z "$DEV_JAR" ]; then
+              echo "No dev.jar found" >&2
+              exit 1
+            fi
+            ROOT_JAR="$DEV_JAR"
+            echo "Using dev.jar: $ROOT_JAR"
+          else
+            ROOT_JAR=$(find build/libs -maxdepth 1 -type f -name '*.jar' | grep -vE '(-sources|-javadoc|\.module\.jar)$' | sort | head -n 1)
+            if [ -z "$ROOT_JAR" ]; then
+              echo "No final JAR found" >&2
+              exit 1
+            fi
+            echo "Using final JAR: $ROOT_JAR"
+          fi
           NEW_NAME="showmyitem-${MODRINTH_VERSION}.jar"
           cp "$ROOT_JAR" "build/libs/$NEW_NAME"
           echo "RELEASE_JAR=build/libs/$NEW_NAME" >> $GITHUB_ENV

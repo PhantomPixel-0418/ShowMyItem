@@ -58,11 +58,13 @@ jobs:
 
       - name: Find built JAR
         run: |
-          ROOT_JAR=$(find build/libs -maxdepth 1 -type f -name '*.jar' | head -n 1)
+          ROOT_JAR=$(find build/libs -maxdepth 1 -type f -name '*.jar' | grep -vE '(-sources|-javadoc|\.module\.jar)$' | sort | head -n 1)
           if [ -z "$ROOT_JAR" ]; then
             echo "No JAR file found in build/libs" >&2
             exit 1
           fi
+          echo "Selected JAR: $ROOT_JAR"
+          jar tf "$ROOT_JAR" | sed -n '1,80p'
           NEW_NAME="showmyitem-${MODRINTH_VERSION}.jar"
           cp "$ROOT_JAR" "build/libs/$NEW_NAME"
           echo "RELEASE_JAR=build/libs/$NEW_NAME" >> $GITHUB_ENV
@@ -76,6 +78,8 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           body: "Automatically generated release for tag ${{ github.ref_name }}"
+          draft: false
+          prerelease: false
           files: ${{ env.RELEASE_JAR }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

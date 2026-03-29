@@ -4,11 +4,13 @@
   "version": "${version}",
   "name": "Show My Item",
   "description": "Show your item in chat by sending '[item]' and hover to see details.",
-  "authors": ["PhantomPixel-0418"],
+  "authors": [
+    "PhantomPixel-0418"
+  ],
   "contact": {},
   "license": "MIT",
   "icon": "assets/showmyitem/icon.png",
-  "environment": "*",
+  "environment": "server",
   "entrypoints": {
     "main": [
       "com.PhantomPixel0418.showmyitem.Showmyitem"

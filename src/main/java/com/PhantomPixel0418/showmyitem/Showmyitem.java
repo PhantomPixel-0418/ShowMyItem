@@ -73,32 +73,37 @@ public class Showmyitem implements ModInitializer {
 
     /**
      * 创建带方括号的物品显示组件（主副手通用）
-     * 数量部分显示为灰色斜体，物品名称保留原有颜色
+     * 数量部分显示为灰色斜体（仅对可堆叠物品），物品名称保留原有颜色
      */
     private Text createItemComponent(ItemStack stack) {
         if (stack.isEmpty()) {
-            return Text.literal("空手")
+            return Text.translatable("text.showmyitem.empty_hand")
                     .formatted(Formatting.RED)
                     .setStyle(Style.EMPTY.withHoverEvent(
-                            new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal("没有物品").formatted(Formatting.RED))
+                            new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                    Text.translatable("text.showmyitem.no_item").formatted(Formatting.RED))
                     ));
         }
 
         MutableText itemName = stack.getName().copy();
         int count = stack.getCount();
+        int maxCount = stack.getMaxCount();
 
-        String suffix = " ✕" + count;
+        String suffix = (maxCount == 1) ? "" : " ✕" + count;
         HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_ITEM, new HoverEvent.ItemStackContent(stack));
         Style hoverStyle = Style.EMPTY.withHoverEvent(hoverEvent);
 
-        // 物品名称添加悬停，保留原有颜色
-        MutableText itemNameWithHover = itemName.setStyle(itemName.getStyle().withHoverEvent(hoverEvent));
-        // 数量文本：灰色斜体 + 悬停
-        Text countText = Text.literal(suffix)
-                .formatted(Formatting.GRAY, Formatting.ITALIC)
-                .setStyle(hoverStyle);
+        MutableText itemNameWithHover = itemName.setStyle(itemName.getStyle().withHoverEvent(hoverStyle));
 
-        MutableText itemWithCount = itemNameWithHover.append(countText);
+        MutableText itemWithCount;
+        if (suffix.isEmpty()) {
+            itemWithCount = itemNameWithHover;
+        } else {
+            Text countText = Text.literal(suffix)
+                    .formatted(Formatting.GRAY, Formatting.ITALIC)
+                    .setStyle(hoverStyle);
+            itemWithCount = itemNameWithHover.append(countText);
+        }
 
         Text leftBracket = Text.literal("[").setStyle(hoverStyle);
         Text rightBracket = Text.literal("]").setStyle(hoverStyle);

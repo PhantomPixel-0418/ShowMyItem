@@ -24,6 +24,7 @@ jobs:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
           TAG_NAME: ${{ github.ref_name }}
         run: |
+          # 解析游戏版本
           DEFAULT_GAME_VERSIONS='1.21.4'
           GAME_VERSIONS=$(printf '%s\n' "$COMMIT_MSG" \
             | grep -iEo 'game-versions:[[:space:]]*.*' \
@@ -47,6 +48,15 @@ jobs:
             printf 'EOF\n'
           } >> $GITHUB_ENV
           echo "MODRINTH_VERSION=$MODRINTH_VERSION" >> $GITHUB_ENV
+
+          # 提取版本类型 (alpha, beta, release)
+          VERSION_TYPE="release"
+          if [[ "$UNPREFIXED_TAG" == *-alpha* ]]; then
+            VERSION_TYPE="alpha"
+          elif [[ "$UNPREFIXED_TAG" == *-beta* ]]; then
+            VERSION_TYPE="beta"
+          fi
+          echo "VERSION_TYPE=$VERSION_TYPE" >> $GITHUB_ENV
         shell: bash
 
       - name: Generate changelog from commits
@@ -146,13 +156,11 @@ jobs:
 
       - name: Fix remapJar (fallback to dev.jar if empty)
         run: |
-          # 检查最终 JAR 的大小
           FINAL_JAR=$(find build/libs -maxdepth 1 -type f -name '*.jar' | grep -vE '(-sources|-javadoc|\.module\.jar)$' | sort | head -n 1)
           if [ -z "$FINAL_JAR" ]; then
             echo "No final JAR found, will use dev.jar if available."
             echo "USE_DEV_JAR=true" >> $GITHUB_ENV
           else
-            # 获取文件大小（兼容 Linux 和 macOS）
             if command -v stat >/dev/null 2>&1; then
               JAR_SIZE=$(stat -c%s "$FINAL_JAR" 2>/dev/null || stat -f%z "$FINAL_JAR" 2>/dev/null)
             else
@@ -221,6 +229,7 @@ jobs:
           project: "pMKJZtiq"
           name: Show My Item ${{ github.event.release.tag_name || github.ref_name }}
           version: ${{ env.MODRINTH_VERSION }}
+          version-type: ${{ env.VERSION_TYPE }}
           changelog: ${{ env.CHANGELOG }}
           loaders: fabric
           game-versions: ${{ env.GAME_VERSIONS }}

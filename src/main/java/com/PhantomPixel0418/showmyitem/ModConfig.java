@@ -15,9 +15,9 @@ public class ModConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Logger LOGGER = LoggerFactory.getLogger(Showmyitem.MOD_ID);
 
-    public long snapshotExpiryMs = 5 * 60 * 1000;   // 5分钟
+    public long snapshotExpiryMs = 5 * 60 * 1000;
     public int maxSnapshots = 100;
-    public String defaultLanguage = "en_us";         // 新增：默认语言
+    public String defaultLanguage = "en_us";
 
     private static ModConfig instance;
 
@@ -41,29 +41,22 @@ public class ModConfig {
             }
         } else {
             instance = new ModConfig();
-            saveTemplate();
+            save();  // 直接生成标准 JSON 文件
             LOGGER.info("Created default config at {}", CONFIG_PATH);
         }
-        I18n.load();   // 每次加载配置后重新加载语言
+        I18n.load();
     }
 
     public static void reload() {
         load();
     }
 
-    private static void saveTemplate() {
-        String template = "{\n" +
-                "  // 背包快照的过期时间（毫秒），超过此时间后快照将无法查看。\n" +
-                "  \"snapshotExpiryMs\": " + instance.snapshotExpiryMs + ",\n" +
-                "  // 同时存储的最大快照数量，超出后自动删除最早的快照。\n" +
-                "  \"maxSnapshots\": " + instance.maxSnapshots + ",\n" +
-                "  // 服务器默认语言，例如 \"en_us\" 或 \"zh_cn\"\n" +
-                "  \"defaultLanguage\": \"" + instance.defaultLanguage + "\"\n" +
-                "}\n";
+    // 新增：保存当前配置到文件
+    public static void save() {
         try (Writer writer = new FileWriter(CONFIG_PATH.toFile())) {
-            writer.write(template);
+            GSON.toJson(instance, writer);
         } catch (IOException e) {
-            LOGGER.error("Failed to save config template.", e);
+            LOGGER.error("Failed to save config.", e);
         }
     }
 
@@ -78,9 +71,7 @@ public class ModConfig {
     }
 
     private static String stripJsonComments(String input) {
-        // 移除 /* ... */ 风格注释
         String noBlockComments = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL).matcher(input).replaceAll("");
-        // 移除 // 行注释
         String noLineComments = Pattern.compile("//[^\n]*").matcher(noBlockComments).replaceAll("");
         return noLineComments;
     }

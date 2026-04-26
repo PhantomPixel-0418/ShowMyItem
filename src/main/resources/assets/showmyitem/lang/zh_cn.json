@@ -9,6 +9,12 @@
   "text.showmyitem.snapshot_expired": "背包快照已过期（%s分钟）",
   "text.showmyitem.config_reloaded": "ShowMyItem 配置已重新加载",
   "text.showmyitem.not_creator": "你没有权限查看这个背包",
+  "text.showmyitem.invalid_language": "无效的语言设置: %s (支持 en_us, zh_cn)",
+  "text.showmyitem.unknown_key": "未知配置项: %s",
+  "text.showmyitem.set_success": "配置 %s 已设为 %s",
+  "text.showmyitem.invalid_value": "无效的值: %s",
+  "text.showmyitem.config_menu_title": "===== Show My Item =====",
+  "text.showmyitem.menu_hint": "点击修改项",
   "placeholder.item": "物品",
   "placeholder.offhand": "副手",
   "placeholder.inventory": "背包"

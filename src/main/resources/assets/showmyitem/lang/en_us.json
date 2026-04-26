@@ -1,0 +1,15 @@
+{
+  "text.showmyitem.empty_hand": "Empty Hand",
+  "text.showmyitem.no_item": "No item",
+  "text.showmyitem.inventory_link": "[%s's Inventory]",
+  "text.showmyitem.inventory_hover": "Click to view inventory",
+  "text.showmyitem.inventory_title": "%s's Inventory",
+  "text.showmyitem.only_player": "Only players can use this command",
+  "text.showmyitem.invalid_snapshot": "Invalid snapshot ID",
+  "text.showmyitem.snapshot_expired": "Inventory snapshot expired (%s minutes)",
+  "text.showmyitem.config_reloaded": "ShowMyItem config reloaded",
+  "text.showmyitem.not_creator": "You don't have permission to view this inventory",
+  "placeholder.item": "item",
+  "placeholder.offhand": "offhand",
+  "placeholder.inventory": "inventory"
+}

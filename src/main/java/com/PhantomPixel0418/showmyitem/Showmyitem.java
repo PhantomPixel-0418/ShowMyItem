@@ -1,87 +1,113 @@
 package com.PhantomPixel0418.showmyitem;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.message.v1.ServerMessageDecoratorEvent;
 import net.minecraft.item.ItemStack;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.*;
 import net.minecraft.util.Formatting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class Showmyitem implements ModInitializer {
     public static final String MOD_ID = "showmyitem";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
-    // 匹配主手和副手占位符（不区分大小写）
-    private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\[(item|offhand)\\]", Pattern.CASE_INSENSITIVE);
-
     @Override
     public void onInitialize() {
         LOGGER.info("Initializing Showmyitem mod");
 
-        ServerMessageDecoratorEvent.EVENT.register(ServerMessageDecoratorEvent.CONTENT_PHASE, (sender, message) -> {
-            String rawText = message.getString();
-            Matcher matcher = PLACEHOLDER_PATTERN.matcher(rawText);
+        // 加载配置（内部会调用 I18n.load()）
+        ModConfig.load();
+        LOGGER.info("Config loaded: expiryMs={}, maxSnapshots={}",
+                ModConfig.getInstance().snapshotExpiryMs,
+                ModConfig.getInstance().maxSnapshots);
 
-            if (!matcher.find()) {
-                return message; // 没有占位符，直接返回原消息
+        // 注册命令
+        CommandRegistrationCallback.EVENT.register(ViewInventoryCommand::register);
+
+        // 定时清理过期快照
+        ServerTickEvents.END_SERVER_TICK.register(server -> {
+            if (server.getTicks() % 1200 == 0) {
+                InventorySnapshotManager.cleanExpired();
             }
+        });
+
+        // 消息装饰器
+        ServerMessageDecoratorEvent.EVENT.register(ServerMessageDecoratorEvent.CONTENT_PHASE, (sender, message) -> {
+            if (!(sender instanceof ServerPlayerEntity player)) return message;
+            String rawText = message.getString();
+
+            // 动态获取占位符
+            List<String> placeholders = I18n.getPlaceholders(player);
+            String regex = "\\[(" + placeholders.stream()
+                    .map(Pattern::quote)
+                    .collect(Collectors.joining("|")) + ")\\]";
+            Pattern pattern = Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
+            Matcher matcher = pattern.matcher(rawText);
+            if (!matcher.find()) return message;
 
             MutableText result = Text.empty();
             int lastEnd = 0;
             matcher.reset();
 
+            // 获取当前语言的占位符文本用于比较
+            String itemPlace = I18n.translate(player, "placeholder.item").toLowerCase();
+            String offhandPlace = I18n.translate(player, "placeholder.offhand").toLowerCase();
+            String inventoryPlace = I18n.translate(player, "placeholder.inventory").toLowerCase();
+
             while (matcher.find()) {
-                // 添加占位符之前的普通文本
                 if (matcher.start() > lastEnd) {
-                    String before = rawText.substring(lastEnd, matcher.start());
-                    result.append(Text.literal(before));
+                    result.append(Text.literal(rawText.substring(lastEnd, matcher.start()))
+                            .setStyle(message.getStyle()));
                 }
 
-                // 根据占位符类型获取对应物品
                 String placeholder = matcher.group(1).toLowerCase();
-                ItemStack stack;
-                if ("item".equals(placeholder)) {
-                    stack = (sender != null) ? sender.getMainHandStack() : ItemStack.EMPTY;
-                } else { // offhand
-                    stack = (sender != null) ? sender.getOffHandStack() : ItemStack.EMPTY;
+                // 判断占位符类型
+                if (placeholder.equals("item") || placeholder.equals(itemPlace)) {
+                    result.append(createItemComponent(player.getMainHandStack(), player));
+                } else if (placeholder.equals("offhand") || placeholder.equals(offhandPlace)) {
+                    result.append(createItemComponent(player.getOffHandStack(), player));
+                } else if (placeholder.equals("inventory") || placeholder.equals(inventoryPlace) || placeholder.equals("背包")) {
+                    ItemStack[] inventory = new ItemStack[36];
+                    for (int i = 0; i < 36; i++) {
+                        inventory[i] = player.getInventory().getStack(i).copy();
+                    }
+                    String playerName = player.getName().getString();
+                    UUID snapshotId = InventorySnapshotManager.storeSnapshot(inventory, playerName, player.getUuid());
+                    result.append(createInventoryComponent(player, snapshotId));
+                } else {
+                    result.append(Text.literal("[" + placeholder + "]"));
                 }
-                Text itemComponent = createItemComponent(stack);
-                result.append(itemComponent);
 
                 lastEnd = matcher.end();
             }
 
-            // 添加最后一段普通文本
             if (lastEnd < rawText.length()) {
-                String after = rawText.substring(lastEnd);
-                result.append(Text.literal(after));
-            }
-
-            // 尝试保留原始消息的整体样式（如颜色等）
-            Style originalStyle = message.getStyle();
-            if (originalStyle != null && !originalStyle.isEmpty()) {
-                result.setStyle(originalStyle);
+                result.append(Text.literal(rawText.substring(lastEnd)).setStyle(message.getStyle()));
             }
 
             return result;
         });
     }
 
-    /**
-     * 创建带方括号的物品显示组件（主副手通用）
-     * 数量部分显示为灰色斜体（仅对可堆叠物品），物品名称保留原有颜色
-     */
-    private Text createItemComponent(ItemStack stack) {
+    private Text createItemComponent(ItemStack stack, ServerPlayerEntity player) {
         if (stack.isEmpty()) {
-            return Text.translatable("text.showmyitem.empty_hand")
+            String empty = I18n.translate(player, "text.showmyitem.empty_hand");
+            String noItem = I18n.translate(player, "text.showmyitem.no_item");
+            return Text.literal(empty)
                     .formatted(Formatting.RED)
                     .setStyle(Style.EMPTY.withHoverEvent(
                             new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                                    Text.translatable("text.showmyitem.no_item").formatted(Formatting.RED))
+                                    Text.literal(noItem).formatted(Formatting.RED))
                     ));
         }
 
@@ -90,11 +116,11 @@ public class Showmyitem implements ModInitializer {
         int maxCount = stack.getMaxCount();
 
         String suffix = (maxCount == 1) ? "" : " ✕" + count;
-        HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_ITEM, new HoverEvent.ItemStackContent(stack));
+        HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_ITEM,
+                new HoverEvent.ItemStackContent(stack));
         Style hoverStyle = Style.EMPTY.withHoverEvent(hoverEvent);
 
-        MutableText itemNameWithHover = itemName.setStyle(itemName.getStyle().withHoverEvent(hoverStyle));
-
+        MutableText itemNameWithHover = itemName.setStyle(hoverStyle);
         MutableText itemWithCount;
         if (suffix.isEmpty()) {
             itemWithCount = itemNameWithHover;
@@ -112,5 +138,18 @@ public class Showmyitem implements ModInitializer {
                 .append(leftBracket)
                 .append(itemWithCount)
                 .append(rightBracket);
+    }
+
+    private Text createInventoryComponent(ServerPlayerEntity player, UUID snapshotId) {
+        String playerName = player.getName().getString();
+        String linkText = I18n.translate(player, "text.showmyitem.inventory_link", playerName);
+        String hoverText = I18n.translate(player, "text.showmyitem.inventory_hover");
+
+        return Text.literal(linkText)
+                .setStyle(Style.EMPTY
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
+                                "/showmyitem viewinv " + snapshotId.toString()))
+                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                Text.literal(hoverText))));
     }
 }

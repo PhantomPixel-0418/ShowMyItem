@@ -1,0 +1,15 @@
+{
+  "text.showmyitem.empty_hand": "空手",
+  "text.showmyitem.no_item": "没有物品",
+  "text.showmyitem.inventory_link": "[%s 的背包]",
+  "text.showmyitem.inventory_hover": "点击查看背包",
+  "text.showmyitem.inventory_title": "%s 的背包",
+  "text.showmyitem.only_player": "只有玩家可以使用此命令",
+  "text.showmyitem.invalid_snapshot": "无效的快照ID",
+  "text.showmyitem.snapshot_expired": "背包快照已过期（%s分钟）",
+  "text.showmyitem.config_reloaded": "ShowMyItem 配置已重新加载",
+  "text.showmyitem.not_creator": "你没有权限查看这个背包",
+  "placeholder.item": "物品",
+  "placeholder.offhand": "副手",
+  "placeholder.inventory": "背包"
+}

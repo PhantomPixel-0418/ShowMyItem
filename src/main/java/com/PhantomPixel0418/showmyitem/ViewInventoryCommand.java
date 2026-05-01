@@ -2,7 +2,7 @@ package com.PhantomPixel0418.showmyitem;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
-import com.mojang.brigadier.context.CommandContext;                     // 新增导入
+import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.command.CommandRegistryAccess;
 import net.minecraft.item.ItemStack;
 import net.minecraft.screen.SimpleNamedScreenHandlerFactory;
@@ -11,18 +11,27 @@ import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.*;
 import net.minecraft.util.Formatting;
-import java.util.UUID;
+import java.util.*;
 
 public class ViewInventoryCommand {
+
+    // 配置项分类定义（类别键 → 包含的配置键列表）
+    private static final Map<String, List<String>> CATEGORIES = new LinkedHashMap<>();
+    static {
+        CATEGORIES.put("general", Arrays.asList("defaultLanguage"));
+        CATEGORIES.put("snapshot", Arrays.asList("snapshotExpiryMs", "maxSnapshots"));
+    }
 
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher,
                                 CommandRegistryAccess registryAccess,
                                 CommandManager.RegistrationEnvironment environment) {
-        @SuppressWarnings("unused")                                 // 抑制未使用警告
-        var unused = new Object() { Object x = registryAccess; Object y = environment; }; // 或直接用注解
-
         dispatcher.register(CommandManager.literal("showmyitem")
-                .executes(ViewInventoryCommand::showMainMenu)
+                .executes(ViewInventoryCommand::showCategories)
+                .then(CommandManager.literal("category")
+                        .then(CommandManager.argument("category", StringArgumentType.word())
+                                .executes(ViewInventoryCommand::showCategoryConfig)
+                        )
+                )
                 .then(CommandManager.literal("viewinv")
                         .then(CommandManager.argument("snapshot", StringArgumentType.word())
                                 .executes(ViewInventoryCommand::viewInventory)
@@ -41,6 +50,71 @@ public class ViewInventoryCommand {
                         )
                 )
         );
+    }
+
+    private static int showCategories(CommandContext<ServerCommandSource> context) {
+        ServerCommandSource source = context.getSource();
+        ServerPlayerEntity player = source.getPlayer();
+        ModConfig config = ModConfig.getInstance();
+
+        MutableText menu = Text.literal(I18n.translate(player, "text.showmyitem.menu_title"))
+                .formatted(Formatting.WHITE, Formatting.BOLD);
+        menu.append("\n");
+
+        // 列出所有类别按钮
+        for (String catKey : CATEGORIES.keySet()) {
+            String catName = I18n.translate(player, "category." + catKey);
+            MutableText btn = Text.literal("[" + catName + "]").formatted(Formatting.AQUA)
+                    .setStyle(Style.EMPTY.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
+                            "/showmyitem category " + catKey)));
+            menu.append(btn).append(" ");
+        }
+
+        source.sendFeedback(() -> menu, false);
+        return 1;
+    }
+
+    private static int showCategoryConfig(CommandContext<ServerCommandSource> context) {
+        String catKey = StringArgumentType.getString(context, "category");
+        ServerCommandSource source = context.getSource();
+        ServerPlayerEntity player = source.getPlayer();
+        ModConfig config = ModConfig.getInstance();
+
+        List<String> keys = CATEGORIES.get(catKey);
+        if (keys == null) {
+            source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.invalid_category", catKey)));
+            return 0;
+        }
+
+        MutableText message = Text.literal(I18n.translate(player, "text.showmyitem.menu_title"))
+                .formatted(Formatting.WHITE, Formatting.BOLD);
+        message.append("\n");
+
+        String catDesc = I18n.translate(player, "category." + catKey + ".desc");
+        message.append(Text.literal(catDesc).formatted(Formatting.GRAY, Formatting.ITALIC)).append("\n");
+
+        for (String key : keys) {
+            String translatedName = I18n.translate(player, "config." + key);
+            MutableText line = Text.literal("- " + translatedName + " (" + key + "): ");
+            // 根据键获取当前值
+            String currentVal = switch (key) {
+                case "snapshotExpiryMs" -> config.snapshotExpiryMs + " ms";
+                case "maxSnapshots" -> String.valueOf(config.maxSnapshots);
+                case "defaultLanguage" -> config.defaultLanguage;
+                default -> "?";
+            };
+            line.append(Text.literal(currentVal).formatted(Formatting.GRAY, Formatting.ITALIC));
+
+            // 编辑按钮
+            MutableText editBtn = Text.literal(" [✎]").formatted(Formatting.AQUA)
+                    .setStyle(Style.EMPTY.withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
+                            "/showmyitem set " + key + " ")));
+            line.append(editBtn);
+            message.append(line).append("\n");
+        }
+
+        source.sendFeedback(() -> message, false);
+        return 1;
     }
 
     private static int viewInventory(CommandContext<ServerCommandSource> context) {
@@ -127,48 +201,5 @@ public class ViewInventoryCommand {
             source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.invalid_value", valueStr)));
             return 0;
         }
-    }
-
-    private static int showMainMenu(CommandContext<ServerCommandSource> context) {
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
-        ModConfig config = ModConfig.getInstance();
-
-        MutableText menu = Text.literal(I18n.translate(player, "text.showmyitem.config_menu_title"))
-                .formatted(Formatting.GOLD, Formatting.BOLD);
-        menu.append("\n");
-
-        MutableText expiryLine = Text.literal("snapshotExpiryMs: " + config.snapshotExpiryMs + " ms")
-                .formatted(Formatting.YELLOW);
-        expiryLine.append(
-                Text.literal(" [✎]").formatted(Formatting.AQUA)
-                        .setStyle(Style.EMPTY.withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
-                                "/showmyitem set snapshotExpiryMs ")))
-        );
-        menu.append(expiryLine).append("\n");
-
-        MutableText maxLine = Text.literal("maxSnapshots: " + config.maxSnapshots)
-                .formatted(Formatting.YELLOW);
-        maxLine.append(
-                Text.literal(" [✎]").formatted(Formatting.AQUA)
-                        .setStyle(Style.EMPTY.withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
-                                "/showmyitem set maxSnapshots ")))
-        );
-        menu.append(maxLine).append("\n");
-
-        String currentLang = config.defaultLanguage;
-        String toggleLang = currentLang.equals("en_us") ? "zh_cn" : "en_us";
-        MutableText langLine = Text.literal("defaultLanguage: " + currentLang)
-                .formatted(Formatting.YELLOW);
-        MutableText toggleBtn = Text.literal(" [↻ " + toggleLang + "]").formatted(Formatting.GREEN)
-                .setStyle(Style.EMPTY.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
-                        "/showmyitem set defaultLanguage " + toggleLang)));
-        langLine.append(toggleBtn);
-        menu.append(langLine).append("\n");
-
-        menu.append(Text.literal(I18n.translate(player, "text.showmyitem.menu_hint")).formatted(Formatting.GRAY));
-
-        source.sendFeedback(() -> menu, false);
-        return 1;
     }
 }

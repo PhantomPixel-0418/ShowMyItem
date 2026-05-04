@@ -5,8 +5,15 @@ permissions:
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'build.gradle'
+      - 'gradle.properties'
+      - 'settings.gradle'
+  tags:
+    - 'v*'
   release:
     types: [published]
 
@@ -19,47 +26,71 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set Modrinth version variables from commit
+      - name: Set version variables
         env:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
           TAG_NAME: ${{ github.ref_name }}
+          GITHUB_SHA: ${{ github.sha }}
         run: |
-          # 解析游戏版本
-          DEFAULT_GAME_VERSIONS='1.21.4'
-          GAME_VERSIONS=$(printf '%s\n' "$COMMIT_MSG" \
-            | grep -iEo 'game-versions:[[:space:]]*.*' \
-            | sed -E 's/^[Gg]ame-versions:[[:space:]]*//' \
-            | tr ',' '\n' \
-            | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' \
-            | grep -v '^$')
-          if [ -n "$GAME_VERSIONS" ]; then
-            echo "Detected game versions from commit:"
-            printf '%s\n' "$GAME_VERSIONS"
-          else
-            GAME_VERSIONS="$DEFAULT_GAME_VERSIONS"
-            echo "Using default game version: $GAME_VERSIONS"
-          fi
-          PRIMARY_GAME_VERSION=$(printf '%s\n' "$GAME_VERSIONS" | head -n1 | tr -d '[:space:]')
-          UNPREFIXED_TAG=${TAG_NAME#v}
-          MODRINTH_VERSION="${UNPREFIXED_TAG}+${PRIMARY_GAME_VERSION}fabric"
-          {
-            printf 'GAME_VERSIONS<<EOF\n'
-            printf '%s\n' "$GAME_VERSIONS"
-            printf 'EOF\n'
-          } >> $GITHUB_ENV
-          echo "MODRINTH_VERSION=$MODRINTH_VERSION" >> $GITHUB_ENV
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" != "tag" ]]; then
+            echo "IS_ALPHA=true" >> $GITHUB_ENV
+            ALPHA_VERSION="1.0.0-alpha.${GITHUB_SHA:0:7}"
+            echo "MODRINTH_VERSION=$ALPHA_VERSION" >> $GITHUB_ENV
+            echo "VERSION_TYPE=alpha" >> $GITHUB_ENV
+            echo "UNPREFIXED_TAG=$ALPHA_VERSION" >> $GITHUB_ENV
+            echo "GAME_VERSIONS=1.21.4" >> $GITHUB_ENV
+            
+            # 生成简单的 alpha changelog
+            cat << EOF > alpha_changelog.md
+          > ![warning](https://img.shields.io/badge/Warning-Alpha%20Version-yellow)
+          > ⚠️ 这是一个自动构建的 Alpha 测试版本
 
-          # 提取版本类型 (alpha, beta, release)
-          VERSION_TYPE="release"
-          if [[ "$UNPREFIXED_TAG" == *-alpha* ]]; then
-            VERSION_TYPE="alpha"
-          elif [[ "$UNPREFIXED_TAG" == *-beta* ]]; then
-            VERSION_TYPE="beta"
+          **Commit:** ${GITHUB_SHA:0:7}
+          **Commit Message:** $COMMIT_MSG
+          **构建时间:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+          此版本仅用于测试，可能包含未完成的功能。
+          EOF
+            echo "CHANGELOG_FILE=alpha_changelog.md" >> $GITHUB_ENV
+          else
+            echo "IS_ALPHA=false" >> $GITHUB_ENV
+            
+            # 解析游戏版本
+            DEFAULT_GAME_VERSIONS='1.21.4'
+            GAME_VERSIONS=$(printf '%s\n' "$COMMIT_MSG" \
+              | grep -iEo 'game-versions:[[:space:]]*.*' \
+              | sed -E 's/^[Gg]ame-versions:[[:space:]]*//' \
+              | tr ',' '\n' \
+              | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' \
+              | grep -v '^$')
+            if [ -z "$GAME_VERSIONS" ]; then
+              GAME_VERSIONS="$DEFAULT_GAME_VERSIONS"
+            fi
+            PRIMARY_GAME_VERSION=$(printf '%s\n' "$GAME_VERSIONS" | head -n1 | tr -d '[:space:]')
+            UNPREFIXED_TAG=${TAG_NAME#v}
+            MODRINTH_VERSION="${UNPREFIXED_TAG}+${PRIMARY_GAME_VERSION}fabric"
+            
+            # 提取版本类型
+            VERSION_TYPE="release"
+            if [[ "$UNPREFIXED_TAG" == *-alpha* ]]; then
+              VERSION_TYPE="alpha"
+            elif [[ "$UNPREFIXED_TAG" == *-beta* ]]; then
+              VERSION_TYPE="beta"
+            fi
+            
+            {
+              printf 'GAME_VERSIONS<<EOF\n'
+              printf '%s\n' "$GAME_VERSIONS"
+              printf 'EOF\n'
+            } >> $GITHUB_ENV
+            echo "MODRINTH_VERSION=$MODRINTH_VERSION" >> $GITHUB_ENV
+            echo "VERSION_TYPE=$VERSION_TYPE" >> $GITHUB_ENV
+            echo "UNPREFIXED_TAG=$UNPREFIXED_TAG" >> $GITHUB_ENV
           fi
-          echo "VERSION_TYPE=$VERSION_TYPE" >> $GITHUB_ENV
         shell: bash
 
-      - name: Generate changelog from commits
+      - name: Generate changelog from commits (stable only)
+        if: env.IS_ALPHA == 'false'
         run: |
           python3 << 'EOF'
           import os, subprocess, re
@@ -130,8 +161,10 @@ jobs:
           if not changelog.strip():
               changelog = f"## Changes in {current_tag}\n\n- No changes recorded"
 
+          with open('stable_changelog.md', 'w') as f:
+              f.write(changelog)
           with open(os.environ['GITHUB_ENV'], 'a') as f:
-              f.write(f"CHANGELOG<<EOF\n{changelog}\nEOF\n")
+              f.write("CHANGELOG_FILE=stable_changelog.md\n")
           EOF
         shell: bash
 
@@ -154,12 +187,14 @@ jobs:
       - name: Build with Gradle
         run: chmod +x gradlew && ./gradlew clean build
 
-      - name: Fix remapJar (fallback to dev.jar if empty)
+      - name: Find and prepare JAR
         run: |
           FINAL_JAR=$(find build/libs -maxdepth 1 -type f -name '*.jar' | grep -vE '(-sources|-javadoc|\.module\.jar)$' | sort | head -n 1)
+          
+          USE_DEV_JAR=false
           if [ -z "$FINAL_JAR" ]; then
-            echo "No final JAR found, will use dev.jar if available."
-            echo "USE_DEV_JAR=true" >> $GITHUB_ENV
+            echo "No final JAR found, trying dev JAR..."
+            USE_DEV_JAR=true
           else
             if command -v stat >/dev/null 2>&1; then
               JAR_SIZE=$(stat -c%s "$FINAL_JAR" 2>/dev/null || stat -f%z "$FINAL_JAR" 2>/dev/null)
@@ -167,17 +202,13 @@ jobs:
               JAR_SIZE=$(wc -c < "$FINAL_JAR" | tr -d ' ')
             fi
             if [ "$JAR_SIZE" -lt 1024 ]; then
-              echo "Final JAR too small ($JAR_SIZE bytes), will use dev.jar."
-              echo "USE_DEV_JAR=true" >> $GITHUB_ENV
+              echo "Final JAR too small ($JAR_SIZE bytes), using dev JAR"
+              USE_DEV_JAR=true
             else
-              echo "Final JAR size OK ($JAR_SIZE bytes)."
-              echo "USE_DEV_JAR=false" >> $GITHUB_ENV
+              echo "Final JAR size OK ($JAR_SIZE bytes)"
             fi
           fi
-        shell: bash
 
-      - name: Find built JAR (use dev.jar if needed)
-        run: |
           if [ "$USE_DEV_JAR" = "true" ]; then
             DEV_JAR=$(find build/devlibs -maxdepth 1 -type f -name '*.jar' | head -n 1)
             if [ -z "$DEV_JAR" ]; then
@@ -185,52 +216,39 @@ jobs:
               exit 1
             fi
             ROOT_JAR="$DEV_JAR"
-            echo "Using dev.jar: $ROOT_JAR"
+            echo "Using dev JAR: $ROOT_JAR"
           else
-            ROOT_JAR=$(find build/libs -maxdepth 1 -type f -name '*.jar' | grep -vE '(-sources|-javadoc|\.module\.jar)$' | sort | head -n 1)
-            if [ -z "$ROOT_JAR" ]; then
-              echo "No final JAR found" >&2
-              exit 1
-            fi
+            ROOT_JAR="$FINAL_JAR"
             echo "Using final JAR: $ROOT_JAR"
           fi
+
           NEW_NAME="showmyitem-${MODRINTH_VERSION}.jar"
           cp "$ROOT_JAR" "build/libs/$NEW_NAME"
           echo "RELEASE_JAR=build/libs/$NEW_NAME" >> $GITHUB_ENV
-          ls -al build/libs
+          ls -al build/libs/
         shell: bash
 
-      - name: Create GitHub Release from tag and upload JAR
-        if: github.event_name == 'push'
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          body: ${{ env.CHANGELOG }}
+          tag_name: ${{ env.UNPREFIXED_TAG }}
+          name: ${{ env.MODRINTH_VERSION }}
+          body_path: ${{ env.CHANGELOG_FILE }}
           draft: false
-          prerelease: false
-          files: ${{ env.RELEASE_JAR }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload JAR asset to GitHub Release
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v1
-        with:
+          prerelease: ${{ env.IS_ALPHA == 'true' }}
           files: ${{ env.RELEASE_JAR }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload to Modrinth
-        if: github.event_name == 'push'
         uses: cloudnode-pro/modrinth-publish@v2
         with:
           token: ${{ secrets.MODRINTH_TOKEN }}
           project: "pMKJZtiq"
-          name: Show My Item ${{ github.event.release.tag_name || github.ref_name }}
+          name: Show My Item ${{ env.MODRINTH_VERSION }}
           version: ${{ env.MODRINTH_VERSION }}
           version-type: ${{ env.VERSION_TYPE }}
-          changelog: ${{ env.CHANGELOG }}
+          changelog-file: ${{ env.CHANGELOG_FILE }}
           loaders: fabric
           game-versions: ${{ env.GAME_VERSIONS }}
           files: ${{ env.RELEASE_JAR }}

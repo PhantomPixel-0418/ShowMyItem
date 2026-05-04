@@ -26,21 +26,32 @@ public class ViewInventoryCommand {
                                 CommandRegistryAccess registryAccess,
                                 CommandManager.RegistrationEnvironment environment) {
         dispatcher.register(CommandManager.literal("showmyitem")
-                .executes(ViewInventoryCommand::showCategories)
+                // 无参数时显示全部设置
+                .executes(ViewInventoryCommand::showAll)
+                // 分类浏览
                 .then(CommandManager.literal("category")
                         .then(CommandManager.argument("category", StringArgumentType.word())
                                 .executes(ViewInventoryCommand::showCategoryConfig)
                         )
                 )
+                // 模糊搜索
+                .then(CommandManager.literal("find")
+                        .then(CommandManager.argument("query", StringArgumentType.greedyString())
+                                .executes(ViewInventoryCommand::findSettings)
+                        )
+                )
+                // 查看背包快照
                 .then(CommandManager.literal("viewinv")
                         .then(CommandManager.argument("snapshot", StringArgumentType.word())
                                 .executes(ViewInventoryCommand::viewInventory)
                         )
                 )
+                // 重载配置
                 .then(CommandManager.literal("reloadconfig")
                         .requires(source -> source.hasPermissionLevel(2))
                         .executes(ViewInventoryCommand::reloadConfig)
                 )
+                // 修改配置值
                 .then(CommandManager.literal("set")
                         .requires(source -> source.hasPermissionLevel(2))
                         .then(CommandManager.argument("key", StringArgumentType.word())
@@ -52,33 +63,73 @@ public class ViewInventoryCommand {
         );
     }
 
-    private static int showCategories(CommandContext<ServerCommandSource> context) {
+    // ---------- 主菜单：显示所有设置 + 分类标签 ----------
+    private static int showAll(CommandContext<ServerCommandSource> context) {
         ServerCommandSource source = context.getSource();
         ServerPlayerEntity player = source.getPlayer();
-        ModConfig config = ModConfig.getInstance();
 
-        MutableText menu = Text.literal(I18n.translate(player, "text.showmyitem.menu_title"))
+        MutableText message = Text.literal(I18n.translate(player, "text.showmyitem.current_settings"))
                 .formatted(Formatting.WHITE, Formatting.BOLD);
-        menu.append("\n");
+        message.append("\n");
 
-        // 列出所有类别按钮
-        for (String catKey : CATEGORIES.keySet()) {
-            String catName = I18n.translate(player, "category." + catKey);
-            MutableText btn = Text.literal("[" + catName + "]").formatted(Formatting.AQUA)
-                    .setStyle(Style.EMPTY.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
-                            "/showmyitem category " + catKey)));
-            menu.append(btn).append(" ");
+        // 遍历所有类别输出设置项（平铺显示）
+        for (Map.Entry<String, List<String>> entry : CATEGORIES.entrySet()) {
+            for (String key : entry.getValue()) {
+                MutableText line = formatSettingLine(player, key);
+                message.append(line).append("\n");
+            }
         }
 
-        source.sendFeedback(() -> menu, false);
+        // 版本信息（可从 gradle.properties 读取，这里简单写死模组版本，也可通过 FabricLoader 获取）
+        message.append(Text.literal("Mod version: 1.1.0")   // 之后可改为动态读取
+                .formatted(Formatting.WHITE)).append("\n");
+
+        // 分类浏览
+        message.append(Text.literal(I18n.translate(player, "text.showmyitem.browse_categories"))
+                .formatted(Formatting.WHITE)).append("\n");
+        message.append(buildCategoryButtons(player));
+
+        source.sendFeedback(() -> message, false);
         return 1;
     }
 
+    // ---------- 模糊搜索 ----------
+    private static int findSettings(CommandContext<ServerCommandSource> context) {
+        String query = StringArgumentType.getString(context, "query").toLowerCase();
+        ServerCommandSource source = context.getSource();
+        ServerPlayerEntity player = source.getPlayer();
+
+        MutableText message = Text.literal(I18n.translate(player, "text.showmyitem.settings_matching", query))
+                .formatted(Formatting.WHITE, Formatting.BOLD);
+        message.append("\n");
+
+        boolean found = false;
+        for (Map.Entry<String, List<String>> entry : CATEGORIES.entrySet()) {
+            for (String key : entry.getValue()) {
+                String translatedName = I18n.translate(player, "config." + key).toLowerCase();
+                // 匹配键名或翻译名
+                if (key.toLowerCase().contains(query) || translatedName.contains(query)) {
+                    MutableText line = formatSettingLine(player, key);
+                    message.append(line).append("\n");
+                    found = true;
+                }
+            }
+        }
+
+        if (!found) {
+            message.append(Text.literal(I18n.translate(player, "text.showmyitem.no_matching_found"))
+                    .formatted(Formatting.GRAY));
+        }
+
+        source.sendFeedback(() -> message, false);
+        return 1;
+    }
+
+    // ---------- 分类浏览 ----------
     private static int showCategoryConfig(CommandContext<ServerCommandSource> context) {
         String catKey = StringArgumentType.getString(context, "category");
         ServerCommandSource source = context.getSource();
         ServerPlayerEntity player = source.getPlayer();
-        ModConfig config = ModConfig.getInstance();
 
         List<String> keys = CATEGORIES.get(catKey);
         if (keys == null) {
@@ -86,30 +137,12 @@ public class ViewInventoryCommand {
             return 0;
         }
 
-        MutableText message = Text.literal(I18n.translate(player, "text.showmyitem.menu_title"))
+        MutableText message = Text.literal(I18n.translate(player, "text.showmyitem.current_settings"))
                 .formatted(Formatting.WHITE, Formatting.BOLD);
         message.append("\n");
 
-        String catDesc = I18n.translate(player, "category." + catKey + ".desc");
-        message.append(Text.literal(catDesc).formatted(Formatting.GRAY, Formatting.ITALIC)).append("\n");
-
         for (String key : keys) {
-            String translatedName = I18n.translate(player, "config." + key);
-            MutableText line = Text.literal("- " + translatedName + " (" + key + "): ");
-            // 根据键获取当前值
-            String currentVal = switch (key) {
-                case "snapshotExpiryMs" -> config.snapshotExpiryMs + " ms";
-                case "maxSnapshots" -> String.valueOf(config.maxSnapshots);
-                case "defaultLanguage" -> config.defaultLanguage;
-                default -> "?";
-            };
-            line.append(Text.literal(currentVal).formatted(Formatting.GRAY, Formatting.ITALIC));
-
-            // 编辑按钮
-            MutableText editBtn = Text.literal(" [✎]").formatted(Formatting.AQUA)
-                    .setStyle(Style.EMPTY.withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
-                            "/showmyitem set " + key + " ")));
-            line.append(editBtn);
+            MutableText line = formatSettingLine(player, key);
             message.append(line).append("\n");
         }
 
@@ -117,6 +150,92 @@ public class ViewInventoryCommand {
         return 1;
     }
 
+    // ---------- 工具方法：格式化一个设置项为一行 ----------
+    private static MutableText formatSettingLine(ServerPlayerEntity player, String key) {
+        String translatedName = I18n.translate(player, "config." + key);
+        MutableText line = Text.literal("- " + translatedName + " (" + key + "): ")
+                .formatted(Formatting.WHITE);
+
+        ModConfig config = ModConfig.getInstance();
+        switch (key) {
+            case "defaultLanguage" -> {
+                // 语言切换按钮：与 Carpet 的 [true] [false] 风格一致
+                String currentLang = config.defaultLanguage;
+                // 两个语言选项
+                line.append(buildToggleButton(player, "en_us", currentLang));
+                line.append(Text.literal(" "));
+                line.append(buildToggleButton(player, "zh_cn", currentLang));
+            }
+            case "snapshotExpiryMs" -> {
+                String val = config.snapshotExpiryMs + " ms";
+                MutableText valueText = Text.literal(val).formatted(Formatting.YELLOW);
+                // 点击建议命令，悬停提示“点击修改”
+                Style editStyle = Style.EMPTY
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
+                                "/showmyitem set snapshotExpiryMs "))
+                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                Text.literal(I18n.translate(player, "text.showmyitem.click_to_edit"))));
+                valueText.setStyle(editStyle);
+                line.append(valueText);
+            }
+            case "maxSnapshots" -> {
+                String val = String.valueOf(config.maxSnapshots);
+                MutableText valueText = Text.literal(val).formatted(Formatting.YELLOW);
+                Style editStyle = Style.EMPTY
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
+                                "/showmyitem set maxSnapshots "))
+                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                Text.literal(I18n.translate(player, "text.showmyitem.click_to_edit"))));
+                valueText.setStyle(editStyle);
+                line.append(valueText);
+            }
+            default -> line.append(Text.literal("?"));
+        }
+        return line;
+    }
+
+    // 构造语言切换按钮，仿照 [true] [false] 样式：绿色方括号，当前语言黄色，非当前白色
+    private static MutableText buildToggleButton(ServerPlayerEntity player, String lang, String currentLang) {
+        boolean active = lang.equals(currentLang);
+        MutableText bracket = Text.literal("[").formatted(Formatting.GREEN);
+        MutableText content = Text.literal(lang)
+                .formatted(active ? Formatting.YELLOW : Formatting.WHITE);
+        MutableText bracketClose = Text.literal("]").formatted(Formatting.GREEN);
+
+        MutableText button = Text.empty().append(bracket).append(content).append(bracketClose);
+        if (!active) {
+            // 点击可切换至该语言
+            button.setStyle(Style.EMPTY
+                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
+                            "/showmyitem set defaultLanguage " + lang))
+                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                            Text.literal(I18n.translate(player, "text.showmyitem.switch_to", lang)))));
+        }
+        return button;
+    }
+
+    // 构造分类按钮行（Carpet 风格：绿色方括号，浅蓝色文字，悬停提示）
+    private static MutableText buildCategoryButtons(ServerPlayerEntity player) {
+        MutableText line = Text.empty();
+        for (String catKey : CATEGORIES.keySet()) {
+            String catName = I18n.translate(player, "category." + catKey);
+            MutableText bracket = Text.literal("[").formatted(Formatting.GREEN);
+            MutableText catText = Text.literal(catName).formatted(Formatting.AQUA);
+            MutableText bracketClose = Text.literal("]").formatted(Formatting.GREEN);
+
+            MutableText button = Text.empty().append(bracket).append(catText).append(bracketClose);
+            button.setStyle(Style.EMPTY
+                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
+                            "/showmyitem category " + catKey))
+                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                            Text.literal(I18n.translate(player, "text.showmyitem.list_category_hint", catName)))));
+            line.append(button);
+            line.append(Text.literal(" "));
+        }
+        return line;
+    }
+
+    // ---------- 原有的查看背包、重载、设置方法（保留不变）----------
     private static int viewInventory(CommandContext<ServerCommandSource> context) {
         String snapshotIdStr = StringArgumentType.getString(context, "snapshot");
         ServerCommandSource source = context.getSource();

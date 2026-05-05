@@ -25,28 +25,23 @@ public class Showmyitem implements ModInitializer {
     public void onInitialize() {
         LOGGER.info("Initializing Showmyitem mod");
 
-        // 加载配置（内部会调用 I18n.load()）
         ModConfig.load();
         LOGGER.info("Config loaded: expiryMs={}, maxSnapshots={}",
                 ModConfig.getInstance().snapshotExpiryMs,
                 ModConfig.getInstance().maxSnapshots);
 
-        // 注册命令
         CommandRegistrationCallback.EVENT.register(ViewInventoryCommand::register);
 
-        // 定时清理过期快照
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (server.getTicks() % 1200 == 0) {
                 InventorySnapshotManager.cleanExpired();
             }
         });
 
-        // 消息装饰器
         ServerMessageDecoratorEvent.EVENT.register(ServerMessageDecoratorEvent.CONTENT_PHASE, (sender, message) -> {
             if (!(sender instanceof ServerPlayerEntity player)) return message;
             String rawText = message.getString();
 
-            // 动态获取占位符
             List<String> placeholders = I18n.getPlaceholders(player);
             String regex = "\\[(" + placeholders.stream()
                     .map(Pattern::quote)
@@ -59,7 +54,6 @@ public class Showmyitem implements ModInitializer {
             int lastEnd = 0;
             matcher.reset();
 
-            // 获取当前语言的占位符文本用于比较
             String itemPlace = I18n.translate(player, "placeholder.item").toLowerCase();
             String offhandPlace = I18n.translate(player, "placeholder.offhand").toLowerCase();
             String inventoryPlace = I18n.translate(player, "placeholder.inventory").toLowerCase();
@@ -71,18 +65,27 @@ public class Showmyitem implements ModInitializer {
                 }
 
                 String placeholder = matcher.group(1).toLowerCase();
-                // 判断占位符类型
                 if (placeholder.equals("item") || placeholder.equals(itemPlace)) {
                     result.append(createItemComponent(player.getMainHandStack(), player));
                 } else if (placeholder.equals("offhand") || placeholder.equals(offhandPlace)) {
                     result.append(createItemComponent(player.getOffHandStack(), player));
                 } else if (placeholder.equals("inventory") || placeholder.equals(inventoryPlace) || placeholder.equals("背包")) {
+                    // 拷贝主物品栏 36 格
                     ItemStack[] inventory = new ItemStack[36];
                     for (int i = 0; i < 36; i++) {
                         inventory[i] = player.getInventory().getStack(i).copy();
                     }
+                    // 拷贝盔甲 4 格
+                    ItemStack[] armor = new ItemStack[4];
+                    for (int i = 0; i < 4; i++) {
+                        armor[i] = player.getInventory().getArmorStack(i).copy();
+                    }
+                    // 拷贝副手
+                    ItemStack offhand = player.getOffHandStack().copy();
+
                     String playerName = player.getName().getString();
-                    UUID snapshotId = InventorySnapshotManager.storeSnapshot(inventory, playerName, player.getUuid());
+                    UUID snapshotId = InventorySnapshotManager.storeSnapshot(
+                            inventory, armor, offhand, playerName, player.getUuid());
                     result.append(createInventoryComponent(player, snapshotId));
                 } else {
                     result.append(Text.literal("[" + placeholder + "]"));

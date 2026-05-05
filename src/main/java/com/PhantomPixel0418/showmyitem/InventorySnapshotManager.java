@@ -8,7 +8,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class InventorySnapshotManager {
     private static final Map<UUID, InventorySnapshot> SNAPSHOTS = new ConcurrentHashMap<>();
 
-    public static UUID storeSnapshot(ItemStack[] inventory, String playerName, UUID creatorUUID) {
+    public static UUID storeSnapshot(ItemStack[] inventory, ItemStack[] armor, ItemStack offhand,
+                                     String playerName, UUID creatorUUID) {
         ModConfig config = ModConfig.getInstance();
         synchronized (SNAPSHOTS) {
             if (SNAPSHOTS.size() >= config.maxSnapshots) {
@@ -16,7 +17,7 @@ public class InventorySnapshotManager {
                         .min(Map.Entry.comparingByValue((a, b) -> Long.compare(a.getTimestamp(), b.getTimestamp())))
                         .ifPresent(entry -> SNAPSHOTS.remove(entry.getKey()));
             }
-            InventorySnapshot snapshot = new InventorySnapshot(inventory, playerName, creatorUUID);
+            InventorySnapshot snapshot = new InventorySnapshot(inventory, armor, offhand, playerName, creatorUUID);
             SNAPSHOTS.put(snapshot.getId(), snapshot);
             return snapshot.getId();
         }

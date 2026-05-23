@@ -31,6 +31,20 @@ public class Showmyitem implements ModInitializer {
                 ModConfig.getInstance().maxSnapshots);
 
         CommandRegistrationCallback.EVENT.register(ViewInventoryCommand::register);
+        // register enderchest share commands
+        try {
+            com.mojang.brigadier.CommandDispatcher<com.mojang.brigadier.context.CommandContext<ServerCommandSource>> dispatcher = net.minecraft.server.command.CommandManager.ROOT;
+            EnderchestShareCommand.registerCommands(dispatcher);
+        } catch (Throwable t) {
+            LOGGER.warn("Failed to register enderchest share commands: {}", t.toString());
+        }
+
+        // register listener
+        try {
+            EnderchestListener.register();
+        } catch (Throwable t) {
+            LOGGER.warn("Failed to register enderchest listener: {}", t.toString());
+        }
 
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (server.getTicks() % 1200 == 0) {

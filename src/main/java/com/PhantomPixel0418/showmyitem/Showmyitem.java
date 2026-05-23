@@ -31,20 +31,14 @@ public class Showmyitem implements ModInitializer {
                 ModConfig.getInstance().maxSnapshots);
 
         CommandRegistrationCallback.EVENT.register(ViewInventoryCommand::register);
-        // register enderchest share commands
-        try {
-            com.mojang.brigadier.CommandDispatcher<com.mojang.brigadier.context.CommandContext<ServerCommandSource>> dispatcher = net.minecraft.server.command.CommandManager.ROOT;
-            EnderchestShareCommand.registerCommands(dispatcher);
-        } catch (Throwable t) {
-            LOGGER.warn("Failed to register enderchest share commands: {}", t.toString());
-        }
+        // register enderchest share commands under /showmyitem enderchest ...
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            EnderchestShareCommand.register(dispatcher);
+        });
 
         // register listener
-        try {
-            EnderchestListener.register();
-        } catch (Throwable t) {
-            LOGGER.warn("Failed to register enderchest listener: {}", t.toString());
-        }
+        EnderchestListener.register();
+
 
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (server.getTicks() % 1200 == 0) {
@@ -71,6 +65,7 @@ public class Showmyitem implements ModInitializer {
             String itemPlace = I18n.translate(player, "placeholder.item").toLowerCase();
             String offhandPlace = I18n.translate(player, "placeholder.offhand").toLowerCase();
             String inventoryPlace = I18n.translate(player, "placeholder.inventory").toLowerCase();
+            String enderPlace = I18n.translate(player, "placeholder.enderchest").toLowerCase();
 
             while (matcher.find()) {
                 if (matcher.start() > lastEnd) {
@@ -100,6 +95,18 @@ public class Showmyitem implements ModInitializer {
                     String playerName = player.getName().getString();
                     UUID snapshotId = InventorySnapshotManager.storeSnapshot(
                             inventory, armor, offhand, playerName, player.getUuid());
+                    result.append(createInventoryComponent(player, snapshotId));
+                } else if (placeholder.equals("enderchest") || placeholder.equals(enderPlace) || placeholder.equals("末影箱")) {
+                    // copy ender chest
+                    var enderInv = player.getEnderChestInventory();
+                    int size = enderInv.size();
+                    ItemStack[] inv = new ItemStack[Math.max(45, size)];
+                    for (int i = 0; i < inv.length; i++) inv[i] = ItemStack.EMPTY;
+                    for (int i = 0; i < size; i++) inv[i] = enderInv.getStack(i).copy();
+                    ItemStack[] armorEmpty = new ItemStack[4];
+                    for (int i = 0; i < 4; i++) armorEmpty[i] = ItemStack.EMPTY;
+                    ItemStack offhandEmpty = ItemStack.EMPTY;
+                    UUID snapshotId = InventorySnapshotManager.storeSnapshot(inv, armorEmpty, offhandEmpty, player.getName().getString(), player.getUuid());
                     result.append(createInventoryComponent(player, snapshotId));
                 } else {
                     result.append(Text.literal("[" + placeholder + "]"));

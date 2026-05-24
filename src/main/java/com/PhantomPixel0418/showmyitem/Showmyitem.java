@@ -31,14 +31,9 @@ public class Showmyitem implements ModInitializer {
                 ModConfig.getInstance().maxSnapshots);
 
         CommandRegistrationCallback.EVENT.register(ViewInventoryCommand::register);
-        // register enderchest share commands under /showmyitem enderchest ...
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             EnderchestShareCommand.register(dispatcher);
         });
-
-        // register listener
-        EnderchestListener.register();
-
 
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (server.getTicks() % 1200 == 0) {
@@ -79,17 +74,14 @@ public class Showmyitem implements ModInitializer {
                 } else if (placeholder.equals("offhand") || placeholder.equals(offhandPlace)) {
                     result.append(createItemComponent(player.getOffHandStack(), player));
                 } else if (placeholder.equals("inventory") || placeholder.equals(inventoryPlace) || placeholder.equals("背包")) {
-                    // 拷贝主物品栏 36 格
                     ItemStack[] inventory = new ItemStack[36];
                     for (int i = 0; i < 36; i++) {
                         inventory[i] = player.getInventory().getStack(i).copy();
                     }
-                    // 拷贝盔甲 4 格
                     ItemStack[] armor = new ItemStack[4];
                     for (int i = 0; i < 4; i++) {
                         armor[i] = player.getInventory().getArmorStack(i).copy();
                     }
-                    // 拷贝副手
                     ItemStack offhand = player.getOffHandStack().copy();
 
                     String playerName = player.getName().getString();
@@ -97,17 +89,18 @@ public class Showmyitem implements ModInitializer {
                             inventory, armor, offhand, playerName, player.getUuid());
                     result.append(createInventoryComponent(player, snapshotId));
                 } else if (placeholder.equals("enderchest") || placeholder.equals(enderPlace) || placeholder.equals("末影箱")) {
-                    // copy ender chest
                     var enderInv = player.getEnderChestInventory();
                     int size = enderInv.size();
-                    ItemStack[] inv = new ItemStack[Math.max(45, size)];
-                    for (int i = 0; i < inv.length; i++) inv[i] = ItemStack.EMPTY;
-                    for (int i = 0; i < size; i++) inv[i] = enderInv.getStack(i).copy();
-                    ItemStack[] armorEmpty = new ItemStack[4];
-                    for (int i = 0; i < 4; i++) armorEmpty[i] = ItemStack.EMPTY;
-                    ItemStack offhandEmpty = ItemStack.EMPTY;
-                    UUID snapshotId = InventorySnapshotManager.storeSnapshot(inv, armorEmpty, offhandEmpty, player.getName().getString(), player.getUuid());
-                    result.append(createInventoryComponent(player, snapshotId));
+                    ItemStack[] enderItems = new ItemStack[size];
+                    for (int i = 0; i < size; i++) {
+                        enderItems[i] = enderInv.getStack(i).copy();
+                    }
+
+                    String playerName = player.getName().getString();
+                    UUID snapshotId = InventorySnapshotManager.storeSnapshot(
+                            enderItems, new ItemStack[0], ItemStack.EMPTY,
+                            playerName, player.getUuid());
+                    result.append(createEnderChestComponent(player, snapshotId));
                 } else {
                     result.append(Text.literal("[" + placeholder + "]"));
                 }
@@ -173,6 +166,19 @@ public class Showmyitem implements ModInitializer {
                 .setStyle(Style.EMPTY
                         .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
                                 "/showmyitem viewinv " + snapshotId.toString()))
+                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                Text.literal(hoverText))));
+    }
+
+    private Text createEnderChestComponent(ServerPlayerEntity player, UUID snapshotId) {
+        String playerName = player.getName().getString();
+        String linkText = I18n.translate(player, "text.showmyitem.enderchest_link", playerName);
+        String hoverText = I18n.translate(player, "text.showmyitem.enderchest_hover");
+
+        return Text.literal(linkText)
+                .setStyle(Style.EMPTY
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
+                                "/showmyitem viewender " + snapshotId.toString()))
                         .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
                                 Text.literal(hoverText))));
     }

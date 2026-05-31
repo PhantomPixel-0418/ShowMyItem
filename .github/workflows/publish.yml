@@ -103,7 +103,9 @@ jobs:
       - name: Generate changelog from commits (stable only)
         if: env.IS_ALPHA == 'false'
         run: |
+          # 获取当前标签和上一个正式版标签（排除 alpha）
           CURRENT_TAG=${GITHUB_REF_NAME}
+          # 列出所有 tag，按版本排序，排除包含 -alpha 的，取倒数两个
           PREV_TAG=$(git tag --sort=-v:refname | grep -v '\-alpha' | grep -B1 "^$CURRENT_TAG$" | head -n1)
           if [ "$PREV_TAG" = "$CURRENT_TAG" ] || [ -z "$PREV_TAG" ]; then
             PREV_TAG=""
@@ -120,8 +122,8 @@ jobs:
           import os, subprocess, re
           from collections import defaultdict
 
-          current_tag = '$CURRENT_TAG'
-          commit_range = '$COMMIT_RANGE'
+          current_tag = os.environ['CURRENT_TAG']
+          commit_range = os.environ['COMMIT_RANGE']
 
           output = subprocess.check_output(['git', 'log', '--pretty=format:%s|%an|%H', commit_range]).decode().strip()
           commits = [line.split('|', 2) for line in output.split('\n')] if output else []
@@ -180,7 +182,9 @@ jobs:
           with open('stable_changelog.md', 'w') as f:
               f.write(changelog)
           EOF
-          echo "CHANGELOG_FILE=stable_changelog.md" >> $GITHUB_ENV
+        env:
+          CURRENT_TAG: ${{ github.ref_name }}
+          COMMIT_RANGE: ${{ steps.set_tags.outputs.COMMIT_RANGE }}
         shell: bash
 
       - name: Cache Gradle packages

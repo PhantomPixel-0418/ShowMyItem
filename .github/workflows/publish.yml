@@ -97,6 +97,8 @@ jobs:
             echo "VERSION_TYPE=$VERSION_TYPE" >> $GITHUB_ENV
             echo "UNPREFIXED_TAG=$UNPREFIXED_TAG" >> $GITHUB_ENV
             echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
+            # 设置 changelog 文件名
+            echo "CHANGELOG_FILE=stable_changelog.md" >> $GITHUB_ENV
           fi
         shell: bash
 
@@ -184,7 +186,7 @@ jobs:
           EOF
         env:
           CURRENT_TAG: ${{ github.ref_name }}
-          COMMIT_RANGE: ${{ steps.set_tags.outputs.COMMIT_RANGE }}
+          COMMIT_RANGE: ${{ github.ref_name }}  # 这里临时设置为当前 tag，实际在脚本内会重新计算
         shell: bash
 
       - name: Cache Gradle packages

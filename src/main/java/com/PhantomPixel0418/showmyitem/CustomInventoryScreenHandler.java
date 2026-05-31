@@ -1,13 +1,20 @@
 package com.PhantomPixel0418.showmyitem;
 
+import com.mojang.datafixers.util.Pair;
+import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.inventory.Inventory;
 import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.item.ItemStack;
+import net.minecraft.network.packet.s2c.play.EntityEquipmentUpdateS2CPacket;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.screen.slot.Slot;
+import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.server.network.ServerPlayerEntity;
+
+import java.util.List;
 
 public class CustomInventoryScreenHandler extends ScreenHandler {
     private final Inventory inventory;
@@ -18,17 +25,15 @@ public class CustomInventoryScreenHandler extends ScreenHandler {
         inventory.onOpen(playerInventory.player);
 
         int invSize = inventory.size();
-        int rows = (invSize + 8) / 9;  // 向上取整到9的倍数行
-        int totalSlots = rows * 9;
+        int rows = (invSize + 8) / 9;
 
-        // 容器槽位
+        // 容器槽位（只读）
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < 9; col++) {
                 int index = row * 9 + col;
                 if (index < invSize) {
                     this.addSlot(new ReadOnlySlot(inventory, index, 8 + col * 18, 18 + row * 18));
                 } else {
-                    // 填充空槽位，防止客户端越界
                     this.addSlot(new ReadOnlySlot(new SimpleInventory(1), 0, 8 + col * 18, 18 + row * 18));
                 }
             }
@@ -53,7 +58,7 @@ public class CustomInventoryScreenHandler extends ScreenHandler {
         else if (size <= 27) return ScreenHandlerType.GENERIC_9X3;
         else if (size <= 36) return ScreenHandlerType.GENERIC_9X4;
         else if (size <= 45) return ScreenHandlerType.GENERIC_9X5;
-        else return ScreenHandlerType.GENERIC_9X6;  // 最大 54
+        else return ScreenHandlerType.GENERIC_9X6;
     }
 
     @Override
@@ -70,6 +75,37 @@ public class CustomInventoryScreenHandler extends ScreenHandler {
     public void onClosed(PlayerEntity player) {
         super.onClosed(player);
         inventory.onClose(player);
+    }
+
+    @Override
+    public void onSlotClick(int slotIndex, int button, SlotActionType actionType, PlayerEntity player) {
+        ItemStack offhandBefore = player.getOffHandStack().copy();
+        ItemStack cursorBefore = this.getCursorStack().copy();
+
+        boolean shouldBlock = false;
+        if (slotIndex >= 0 && slotIndex < this.slots.size()) {
+            if (this.slots.get(slotIndex) instanceof ReadOnlySlot) {
+                shouldBlock = true;
+            }
+        } else if (actionType == SlotActionType.SWAP) {
+            shouldBlock = true;
+        }
+
+        if (shouldBlock) {
+            // 不执行任何物品移动，恢复副手和光标，然后同步
+            this.setCursorStack(cursorBefore);
+            player.getInventory().offHand.set(0, offhandBefore);
+            if (player instanceof ServerPlayerEntity serverPlayer) {
+                serverPlayer.currentScreenHandler.sendContentUpdates();
+                serverPlayer.networkHandler.sendPacket(
+                        new EntityEquipmentUpdateS2CPacket(serverPlayer.getId(),
+                                List.of(Pair.of(EquipmentSlot.OFFHAND, offhandBefore)))
+                );
+            }
+            return;
+        }
+
+        super.onSlotClick(slotIndex, button, actionType, player);
     }
 
     private static class ReadOnlySlot extends Slot {

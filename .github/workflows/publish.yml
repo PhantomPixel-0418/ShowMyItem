@@ -97,7 +97,6 @@ jobs:
             echo "VERSION_TYPE=$VERSION_TYPE" >> $GITHUB_ENV
             echo "UNPREFIXED_TAG=$UNPREFIXED_TAG" >> $GITHUB_ENV
             echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
-            # 设置 changelog 文件名
             echo "CHANGELOG_FILE=stable_changelog.md" >> $GITHUB_ENV
           fi
         shell: bash
@@ -105,9 +104,7 @@ jobs:
       - name: Generate changelog from commits (stable only)
         if: env.IS_ALPHA == 'false'
         run: |
-          # 获取当前标签和上一个正式版标签（排除 alpha）
           CURRENT_TAG=${GITHUB_REF_NAME}
-          # 列出所有 tag，按版本排序，排除包含 -alpha 的，取倒数两个
           PREV_TAG=$(git tag --sort=-v:refname | grep -v '\-alpha' | grep -B1 "^$CURRENT_TAG$" | head -n1)
           if [ "$PREV_TAG" = "$CURRENT_TAG" ] || [ -z "$PREV_TAG" ]; then
             PREV_TAG=""
@@ -186,7 +183,7 @@ jobs:
           EOF
         env:
           CURRENT_TAG: ${{ github.ref_name }}
-          COMMIT_RANGE: ${{ github.ref_name }}  # 这里临时设置为当前 tag，实际在脚本内会重新计算
+          COMMIT_RANGE: ${{ github.ref_name }}
         shell: bash
 
       - name: Cache Gradle packages
@@ -210,18 +207,22 @@ jobs:
 
       - name: Find and prepare JAR
         run: |
-          FINAL_JAR=$(find build/libs -maxdepth 1 -type f -name '*.jar' | grep -vE '(-sources|-javadoc|\.module\.jar)$' | sort | head -n 1)
+          echo "Listing build/libs directory:"
+          ls -la build/libs/ || echo "build/libs does not exist"
+          echo "Listing build/devlibs directory:"
+          ls -la build/devlibs/ || echo "build/devlibs does not exist"
+          echo "Listing build directory (top-level):"
+          ls -la build/ | head -20
+
+          # 尝试查找 final jar（排除 -sources, -javadoc, .module）
+          FINAL_JAR=$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name '*.module.jar' | sort | head -n 1)
           
           USE_DEV_JAR=false
           if [ -z "$FINAL_JAR" ]; then
             echo "No final JAR found, trying dev JAR..."
             USE_DEV_JAR=true
           else
-            if command -v stat >/dev/null 2>&1; then
-              JAR_SIZE=$(stat -c%s "$FINAL_JAR" 2>/dev/null || stat -f%z "$FINAL_JAR" 2>/dev/null)
-            else
-              JAR_SIZE=$(wc -c < "$FINAL_JAR" | tr -d ' ')
-            fi
+            JAR_SIZE=$(stat -c%s "$FINAL_JAR" 2>/dev/null || stat -f%z "$FINAL_JAR" 2>/dev/null)
             if [ "$JAR_SIZE" -lt 1024 ]; then
               echo "Final JAR too small ($JAR_SIZE bytes), using dev JAR"
               USE_DEV_JAR=true
@@ -231,9 +232,10 @@ jobs:
           fi
 
           if [ "$USE_DEV_JAR" = "true" ]; then
-            DEV_JAR=$(find build/devlibs -maxdepth 1 -type f -name '*.jar' | head -n 1)
+            # 尝试多种可能的 dev jar 位置
+            DEV_JAR=$(find build/devlibs build/libs -maxdepth 2 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name '*.module.jar' | sort | head -n 1)
             if [ -z "$DEV_JAR" ]; then
-              echo "No dev.jar found" >&2
+              echo "No dev.jar found in build/devlibs or build/libs" >&2
               exit 1
             fi
             ROOT_JAR="$DEV_JAR"

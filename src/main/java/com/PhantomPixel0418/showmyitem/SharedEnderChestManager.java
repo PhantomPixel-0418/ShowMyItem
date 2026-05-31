@@ -1,27 +1,27 @@
 package com.PhantomPixel0418.showmyitem;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Simple shared ender chest manager. Persists a map ownerUuid -> set of member UUIDs to a JSON file in config.
- * Note: minimal implementation for initial feature – permission model is whitelist (owner + invited members).
- */
 public class SharedEnderChestManager {
     private static final String FILE_NAME = "enderchest_shared.json";
-    private static final Gson GSON = new Gson();
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final int CURRENT_VERSION = 1;
 
     private final Map<UUID, Set<UUID>> shares = new ConcurrentHashMap<>();
-
     private static SharedEnderChestManager instance;
 
     public static synchronized SharedEnderChestManager getInstance() {
@@ -33,12 +33,12 @@ public class SharedEnderChestManager {
         load();
     }
 
-    public synchronized void invite(UUID owner, UUID member) {
+    public void invite(UUID owner, UUID member) {
         shares.computeIfAbsent(owner, k -> Collections.newSetFromMap(new ConcurrentHashMap<>())).add(member);
         save();
     }
 
-    public synchronized void revoke(UUID owner, UUID member) {
+    public void revoke(UUID owner, UUID member) {
         Set<UUID> set = shares.get(owner);
         if (set != null) {
             set.remove(member);
@@ -47,52 +47,92 @@ public class SharedEnderChestManager {
         }
     }
 
-    public synchronized Set<UUID> listMembers(UUID owner) {
+    public Set<UUID> listMembers(UUID owner) {
         return Collections.unmodifiableSet(shares.getOrDefault(owner, Collections.emptySet()));
     }
 
-    public synchronized boolean isSharedWith(UUID owner, UUID member) {
+    public boolean isSharedWith(UUID owner, UUID member) {
         return owner.equals(member) || shares.getOrDefault(owner, Collections.emptySet()).contains(member);
     }
 
+    public UUID findInviter(UUID member) {
+        for (Map.Entry<UUID, Set<UUID>> entry : shares.entrySet()) {
+            if (entry.getValue().contains(member)) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+
     private File getFile() {
-        File configDir = FabricLoader.getInstance().getConfigDir().toFile();
-        return new File(configDir, FILE_NAME);
+        return new File(FabricLoader.getInstance().getConfigDir().toFile(), FILE_NAME);
     }
 
     private void load() {
-        try {
-            File f = getFile();
-            if (!f.exists()) return;
-            FileReader r = new FileReader(f, StandardCharsets.UTF_8);
-            Type type = new TypeToken<Map<UUID, List<UUID>>>() {}.getType();
-            Map<UUID, List<UUID>> raw = GSON.fromJson(r, type);
-            r.close();
-            if (raw != null) {
-                for (Map.Entry<UUID, List<UUID>> e : raw.entrySet()) {
-                    shares.put(e.getKey(), Collections.newSetFromMap(new ConcurrentHashMap<>()));
-                    shares.get(e.getKey()).addAll(e.getValue());
+        File f = getFile();
+        if (!f.exists()) return;
+
+        DataContainer data = loadFromFile(f);
+        if (data == null) {
+            File bak = new File(f.getParentFile(), f.getName() + ".bak");
+            if (bak.exists()) {
+                Showmyitem.LOGGER.info("Attempting to restore ender chest shares from backup");
+                data = loadFromFile(bak);
+                if (data != null) {
+                    Showmyitem.LOGGER.info("Restored from backup successfully");
                 }
             }
+        }
+
+        if (data != null) {
+            shares.clear();
+            for (Map.Entry<UUID, List<UUID>> e : data.shares.entrySet()) {
+                shares.put(e.getKey(), Collections.newSetFromMap(new ConcurrentHashMap<>()));
+                shares.get(e.getKey()).addAll(e.getValue());
+            }
+        }
+    }
+
+    private DataContainer loadFromFile(File file) {
+        try (FileReader reader = new FileReader(file, StandardCharsets.UTF_8)) {
+            Type type = new TypeToken<DataContainer>() {}.getType();
+            return GSON.fromJson(reader, type);
         } catch (Exception ex) {
-            ex.printStackTrace();
+            Showmyitem.LOGGER.error("Failed to load ender chest shares from " + file.getName(), ex);
+            return null;
         }
     }
 
     private void save() {
-        try {
-            File f = getFile();
-            File parent = f.getParentFile();
-            if (parent != null && !parent.exists()) parent.mkdirs();
-            Map<UUID, List<UUID>> raw = new HashMap<>();
-            for (Map.Entry<UUID, Set<UUID>> e : shares.entrySet()) {
-                raw.put(e.getKey(), new ArrayList<>(e.getValue()));
-            }
-            FileWriter w = new FileWriter(f, StandardCharsets.UTF_8);
-            GSON.toJson(raw, w);
-            w.close();
-        } catch (Exception ex) {
-            ex.printStackTrace();
+        File target = getFile();
+        File temp = new File(target.getParentFile(), target.getName() + ".tmp");
+
+        DataContainer container = new DataContainer();
+        container.version = CURRENT_VERSION;
+        container.shares = new HashMap<>();
+        for (Map.Entry<UUID, Set<UUID>> e : shares.entrySet()) {
+            container.shares.put(e.getKey(), new ArrayList<>(e.getValue()));
         }
+
+        try (FileWriter writer = new FileWriter(temp, StandardCharsets.UTF_8)) {
+            GSON.toJson(container, writer);
+            writer.flush();
+            Files.move(temp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException ex) {
+            Showmyitem.LOGGER.error("Failed to save ender chest shares", ex);
+            if (target.exists()) {
+                try {
+                    File bak = new File(target.getParentFile(), target.getName() + ".bak");
+                    Files.copy(target.toPath(), bak.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                } catch (IOException backupEx) {
+                    Showmyitem.LOGGER.error("Failed to create backup before save", backupEx);
+                }
+            }
+        }
+    }
+
+    private static class DataContainer {
+        int version;
+        Map<UUID, List<UUID>> shares;
     }
 }

@@ -27,7 +27,7 @@ public class CustomInventoryScreenHandler extends ScreenHandler {
         int invSize = inventory.size();
         int rows = (invSize + 8) / 9;
 
-        // 容器槽位（只读）
+        // Container slots (read-only)
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < 9; col++) {
                 int index = row * 9 + col;
@@ -39,7 +39,7 @@ public class CustomInventoryScreenHandler extends ScreenHandler {
             }
         }
 
-        // 玩家物品栏
+        // Player inventory
         int playerInvY = 18 + rows * 18 + 4;
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
@@ -68,6 +68,7 @@ public class CustomInventoryScreenHandler extends ScreenHandler {
 
     @Override
     public ItemStack quickMove(PlayerEntity player, int slot) {
+        // Completely disable shift-click moving
         return ItemStack.EMPTY;
     }
 
@@ -79,32 +80,46 @@ public class CustomInventoryScreenHandler extends ScreenHandler {
 
     @Override
     public void onSlotClick(int slotIndex, int button, SlotActionType actionType, PlayerEntity player) {
-        ItemStack offhandBefore = player.getOffHandStack().copy();
-        ItemStack cursorBefore = this.getCursorStack().copy();
+        // Determine if the action should be blocked
+        boolean block = false;
 
-        boolean shouldBlock = false;
+        // Block if clicking on a read-only slot
         if (slotIndex >= 0 && slotIndex < this.slots.size()) {
-            if (this.slots.get(slotIndex) instanceof ReadOnlySlot) {
-                shouldBlock = true;
+            Slot slot = this.slots.get(slotIndex);
+            if (slot instanceof ReadOnlySlot) {
+                block = true;
             }
-        } else if (actionType == SlotActionType.SWAP) {
-            shouldBlock = true;
         }
 
-        if (shouldBlock) {
-            // 不执行任何物品移动，恢复副手和光标，然后同步
+        // Also block SWAP action (number keys) because it can target read-only slots
+        if (actionType == SlotActionType.SWAP) {
+            block = true;
+        }
+
+        if (block) {
+            // Save current cursor and offhand before any changes
+            ItemStack cursorBefore = this.getCursorStack().copy();
+            ItemStack offhandBefore = player.getOffHandStack().copy();
+
+            // Do NOT call super; no action occurs
+
+            // Restore client side state
             this.setCursorStack(cursorBefore);
             player.getInventory().offHand.set(0, offhandBefore);
+
             if (player instanceof ServerPlayerEntity serverPlayer) {
-                serverPlayer.currentScreenHandler.sendContentUpdates();
+                // Send offhand equipment update to client
+                Pair<EquipmentSlot, ItemStack> offhandPair = Pair.of(EquipmentSlot.OFFHAND, offhandBefore);
                 serverPlayer.networkHandler.sendPacket(
-                        new EntityEquipmentUpdateS2CPacket(serverPlayer.getId(),
-                                List.of(Pair.of(EquipmentSlot.OFFHAND, offhandBefore)))
+                        new EntityEquipmentUpdateS2CPacket(serverPlayer.getId(), List.of(offhandPair))
                 );
+                // Also resend the entire screen contents (including cursor stack)
+                serverPlayer.currentScreenHandler.sendContentUpdates();
             }
             return;
         }
 
+        // Allow normal behavior for player inventory slots
         super.onSlotClick(slotIndex, button, actionType, player);
     }
 

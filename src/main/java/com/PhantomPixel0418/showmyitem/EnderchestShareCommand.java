@@ -1,5 +1,6 @@
 package com.PhantomPixel0418.showmyitem;
 
+import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.minecraft.inventory.EnderChestInventory;
@@ -10,10 +11,11 @@ import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 
-import java.util.*;
+import java.util.Optional;
+import java.util.UUID;
 
 public class EnderchestShareCommand {
-    private static final Map<UUID, Set<UUID>> SHARES = new HashMap<>();
+    private static final SharedEnderChestManager MANAGER = SharedEnderChestManager.getInstance();
 
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
         dispatcher.register(
@@ -25,12 +27,14 @@ public class EnderchestShareCommand {
                                                     ServerCommandSource src = ctx.getSource();
                                                     ServerPlayerEntity inviter = src.getPlayerOrThrow();
                                                     String targetName = StringArgumentType.getString(ctx, "player");
-                                                    ServerPlayerEntity target = src.getServer().getPlayerManager().getPlayer(targetName);
-                                                    if (target == null) {
+
+                                                    UUID targetId = getPlayerUuid(src, targetName);
+                                                    if (targetId == null) {
                                                         src.sendError(Text.literal("Player not found: " + targetName));
                                                         return 0;
                                                     }
-                                                    SHARES.computeIfAbsent(inviter.getUuid(), k -> new HashSet<>()).add(target.getUuid());
+
+                                                    MANAGER.invite(inviter.getUuid(), targetId);
                                                     src.sendFeedback(() -> Text.literal("Invited " + targetName + " to view your ender chest"), false);
                                                     return 1;
                                                 })
@@ -42,16 +46,14 @@ public class EnderchestShareCommand {
                                                     ServerCommandSource src = ctx.getSource();
                                                     ServerPlayerEntity inviter = src.getPlayerOrThrow();
                                                     String targetName = StringArgumentType.getString(ctx, "player");
-                                                    ServerPlayerEntity target = src.getServer().getPlayerManager().getPlayer(targetName);
-                                                    if (target == null) {
+
+                                                    UUID targetId = getPlayerUuid(src, targetName);
+                                                    if (targetId == null) {
                                                         src.sendError(Text.literal("Player not found: " + targetName));
                                                         return 0;
                                                     }
-                                                    Set<UUID> set = SHARES.get(inviter.getUuid());
-                                                    if (set != null) {
-                                                        set.remove(target.getUuid());
-                                                        if (set.isEmpty()) SHARES.remove(inviter.getUuid());
-                                                    }
+
+                                                    MANAGER.revoke(inviter.getUuid(), targetId);
                                                     src.sendFeedback(() -> Text.literal("Revoked access for " + targetName), false);
                                                     return 1;
                                                 })
@@ -61,17 +63,21 @@ public class EnderchestShareCommand {
                                         .executes(ctx -> {
                                             ServerCommandSource src = ctx.getSource();
                                             ServerPlayerEntity inviter = src.getPlayerOrThrow();
-                                            Set<UUID> set = SHARES.get(inviter.getUuid());
-                                            if (set == null || set.isEmpty()) {
+                                            var members = MANAGER.listMembers(inviter.getUuid());
+                                            if (members.isEmpty()) {
                                                 src.sendFeedback(() -> Text.literal("No members"), false);
                                             } else {
-                                                StringBuilder sb = new StringBuilder();
-                                                for (UUID id : set) {
+                                                StringBuilder sb = new StringBuilder("Members: ");
+                                                for (UUID id : members) {
                                                     ServerPlayerEntity p = src.getServer().getPlayerManager().getPlayer(id);
-                                                    sb.append(p != null ? p.getName().getString() : id.toString()).append(", ");
+                                                    if (p != null) {
+                                                        sb.append(p.getName().getString()).append(", ");
+                                                    } else {
+                                                        sb.append(id.toString().substring(0, 8)).append(", ");
+                                                    }
                                                 }
                                                 sb.setLength(sb.length() - 2);
-                                                src.sendFeedback(() -> Text.literal("Members: " + sb.toString()), false);
+                                                src.sendFeedback(() -> Text.literal(sb.toString()), false);
                                             }
                                             return 1;
                                         })
@@ -82,25 +88,31 @@ public class EnderchestShareCommand {
                                                     ServerCommandSource src = ctx.getSource();
                                                     ServerPlayerEntity opener = src.getPlayerOrThrow();
                                                     String targetName = StringArgumentType.getString(ctx, "player");
-                                                    ServerPlayerEntity owner = src.getServer().getPlayerManager().getPlayer(targetName);
-                                                    if (owner == null) {
+
+                                                    UUID ownerId = getPlayerUuid(src, targetName);
+                                                    if (ownerId == null) {
                                                         src.sendError(Text.literal("Player not found: " + targetName));
                                                         return 0;
                                                     }
-                                                    if (!opener.getUuid().equals(owner.getUuid())) {
-                                                        Set<UUID> allowed = SHARES.get(owner.getUuid());
-                                                        if (allowed == null || !allowed.contains(opener.getUuid())) {
-                                                            src.sendError(Text.literal("You don't have permission to view this ender chest"));
-                                                            return 0;
-                                                        }
+
+                                                    if (!opener.getUuid().equals(ownerId) && !MANAGER.isSharedWith(ownerId, opener.getUuid())) {
+                                                        src.sendError(Text.literal("You don't have permission to view this ender chest"));
+                                                        return 0;
                                                     }
+
+                                                    ServerPlayerEntity owner = src.getServer().getPlayerManager().getPlayer(ownerId);
+                                                    if (owner == null) {
+                                                        src.sendError(Text.literal("The target player is offline, cannot open their ender chest"));
+                                                        return 0;
+                                                    }
+
                                                     EnderChestInventory enderInv = owner.getEnderChestInventory();
                                                     int size = enderInv.size();
                                                     SimpleInventory tempInv = new SimpleInventory(size);
                                                     for (int i = 0; i < size; i++) {
                                                         tempInv.setStack(i, enderInv.getStack(i).copy());
                                                     }
-                                                    Text title = Text.literal(owner.getName().getString() + " 的末影箱");
+                                                    Text title = Text.literal(owner.getName().getString() + "'s Ender Chest");
                                                     opener.openHandledScreen(new SimpleNamedScreenHandlerFactory(
                                                             (syncId, playerInv, player) -> new CustomInventoryScreenHandler(syncId, playerInv, tempInv),
                                                             title
@@ -112,5 +124,19 @@ public class EnderchestShareCommand {
                                 )
                         )
         );
+    }
+
+    private static UUID getPlayerUuid(ServerCommandSource src, String name) {
+        ServerPlayerEntity online = src.getServer().getPlayerManager().getPlayer(name);
+        if (online != null) return online.getUuid();
+
+        Optional<GameProfile> offlineOpt = src.getServer().getUserCache().findByName(name);
+        if (offlineOpt.isPresent()) {
+            GameProfile profile = offlineOpt.get();
+            if (profile.getId() != null) {
+                return profile.getId();
+            }
+        }
+        return null;
     }
 }

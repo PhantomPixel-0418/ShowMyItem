@@ -44,6 +44,11 @@ public class ViewInventoryCommand {
                                 .executes(ViewInventoryCommand::viewInventory)
                         )
                 )
+                .then(CommandManager.literal("viewender")
+                        .then(CommandManager.argument("snapshot", StringArgumentType.word())
+                                .executes(ViewInventoryCommand::viewEnderChest)
+                        )
+                )
                 .then(CommandManager.literal("reloadconfig")
                         .requires(source -> source.hasPermissionLevel(2))
                         .executes(ViewInventoryCommand::reloadConfig)
@@ -59,6 +64,7 @@ public class ViewInventoryCommand {
         );
     }
 
+    // ---------- 菜单相关 ----------
     private static int showAll(CommandContext<ServerCommandSource> context) {
         ServerCommandSource source = context.getSource();
         ServerPlayerEntity player = source.getPlayer();
@@ -74,7 +80,6 @@ public class ViewInventoryCommand {
             }
         }
 
-        // 动态获取真实模组版本
         String modVersion = getModVersion();
         message.append(Text.literal("Mod version: " + modVersion).formatted(Formatting.WHITE)).append("\n");
 
@@ -223,6 +228,7 @@ public class ViewInventoryCommand {
         return line;
     }
 
+    // ---------- 背包查看（41格）----------
     private static int viewInventory(CommandContext<ServerCommandSource> context) {
         String snapshotIdStr = StringArgumentType.getString(context, "snapshot");
         ServerCommandSource source = context.getSource();
@@ -249,11 +255,10 @@ public class ViewInventoryCommand {
             return 0;
         }
 
-        ItemStack[] mainItems = snapshot.getItems();      // 36格
-        ItemStack[] armorItems = snapshot.getArmor();     // 4格
-        ItemStack offhandItem = snapshot.getOffhand();    // 1格
+        ItemStack[] mainItems = snapshot.getItems();   // 36格
+        ItemStack[] armorItems = snapshot.getArmor();  // 4格
+        ItemStack offhandItem = snapshot.getOffhand(); // 1格
 
-        // 合并为 41 格容器：0-35 主物品栏，36-39 盔甲，40 副手
         SimpleInventory combinedInventory = new SimpleInventory(41);
         for (int i = 0; i < 36; i++) {
             combinedInventory.setStack(i, mainItems[i].copy());
@@ -272,6 +277,49 @@ public class ViewInventoryCommand {
         return 1;
     }
 
+    // ---------- 末影箱查看（27格）----------
+    private static int viewEnderChest(CommandContext<ServerCommandSource> context) {
+        String snapshotIdStr = StringArgumentType.getString(context, "snapshot");
+        ServerCommandSource source = context.getSource();
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) {
+            source.sendError(Text.literal(I18n.translate("text.showmyitem.only_player")));
+            return 0;
+        }
+        UUID snapshotId;
+        try {
+            snapshotId = UUID.fromString(snapshotIdStr);
+        } catch (IllegalArgumentException e) {
+            source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.invalid_snapshot")));
+            return 0;
+        }
+        InventorySnapshot snapshot = InventorySnapshotManager.getSnapshotObject(snapshotId);
+        if (snapshot == null) {
+            long minutes = ModConfig.getInstance().snapshotExpiryMs / 60000;
+            source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.snapshot_expired", minutes)));
+            return 0;
+        }
+        if (!player.getUuid().equals(snapshot.getCreatorUUID()) && !player.hasPermissionLevel(2)) {
+            source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.not_creator")));
+            return 0;
+        }
+
+        ItemStack[] enderItems = snapshot.getItems();  // 27格
+        SimpleInventory inv = new SimpleInventory(27);
+        for (int i = 0; i < 27; i++) {
+            inv.setStack(i, enderItems[i].copy());
+        }
+
+        String playerName = snapshot.getPlayerName();
+        Text title = Text.literal(I18n.translate(player, "text.showmyitem.enderchest_title", playerName));
+        player.openHandledScreen(new SimpleNamedScreenHandlerFactory(
+                (syncId, playerInv, p) -> new CustomInventoryScreenHandler(syncId, playerInv, inv),
+                title
+        ));
+        return 1;
+    }
+
+    // ---------- 配置相关 ----------
     private static int reloadConfig(CommandContext<ServerCommandSource> context) {
         ServerCommandSource source = context.getSource();
         ServerPlayerEntity player = source.getPlayer();

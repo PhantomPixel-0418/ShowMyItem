@@ -34,7 +34,8 @@ public class CustomInventoryScreenHandler extends ScreenHandler {
                 if (index < invSize) {
                     this.addSlot(new ReadOnlySlot(inventory, index, 8 + col * 18, 18 + row * 18));
                 } else {
-                    this.addSlot(new ReadOnlySlot(new SimpleInventory(1), 0, 8 + col * 18, 18 + row * 18));
+                    // Use EmptyInventory singleton to avoid sharing mutable instances
+                    this.addSlot(new ReadOnlySlot(EmptyInventory.INSTANCE, 0, 8 + col * 18, 18 + row * 18));
                 }
             }
         }
@@ -123,6 +124,8 @@ public class CustomInventoryScreenHandler extends ScreenHandler {
         super.onSlotClick(slotIndex, button, actionType, player);
     }
 
+    // ---------- Inner Classes ----------
+
     private static class ReadOnlySlot extends Slot {
         public ReadOnlySlot(Inventory inventory, int index, int x, int y) {
             super(inventory, index, x, y);
@@ -137,5 +140,42 @@ public class CustomInventoryScreenHandler extends ScreenHandler {
         public boolean canTakeItems(PlayerEntity playerEntity) {
             return false;
         }
+    }
+
+    /**
+     * A singleton empty inventory used for dummy slots to avoid sharing mutable instances.
+     * All methods are no-ops or return empty stacks.
+     */
+    private static class EmptyInventory implements Inventory {
+        public static final EmptyInventory INSTANCE = new EmptyInventory();
+
+        private EmptyInventory() {}
+
+        @Override
+        public int size() { return 1; }
+
+        @Override
+        public boolean isEmpty() { return true; }
+
+        @Override
+        public ItemStack getStack(int slot) { return ItemStack.EMPTY; }
+
+        @Override
+        public ItemStack removeStack(int slot, int amount) { return ItemStack.EMPTY; }
+
+        @Override
+        public ItemStack removeStack(int slot) { return ItemStack.EMPTY; }
+
+        @Override
+        public void setStack(int slot, ItemStack stack) {}
+
+        @Override
+        public void markDirty() {}
+
+        @Override
+        public boolean canPlayerUse(PlayerEntity player) { return true; }
+
+        @Override
+        public void clear() {}
     }
 }

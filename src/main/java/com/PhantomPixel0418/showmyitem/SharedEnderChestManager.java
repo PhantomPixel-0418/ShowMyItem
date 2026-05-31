@@ -90,6 +90,7 @@ public class SharedEnderChestManager {
                 shares.put(e.getKey(), Collections.newSetFromMap(new ConcurrentHashMap<>()));
                 shares.get(e.getKey()).addAll(e.getValue());
             }
+            // Future: if data.version != CURRENT_VERSION, perform migration
         }
     }
 

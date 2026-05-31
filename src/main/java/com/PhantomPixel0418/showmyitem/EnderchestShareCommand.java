@@ -11,6 +11,8 @@ import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -64,21 +66,25 @@ public class EnderchestShareCommand {
                                             ServerCommandSource src = ctx.getSource();
                                             ServerPlayerEntity inviter = src.getPlayerOrThrow();
                                             var members = MANAGER.listMembers(inviter.getUuid());
+
                                             if (members.isEmpty()) {
                                                 src.sendFeedback(() -> Text.literal("No members"), false);
-                                            } else {
-                                                StringBuilder sb = new StringBuilder("Members: ");
-                                                for (UUID id : members) {
-                                                    ServerPlayerEntity p = src.getServer().getPlayerManager().getPlayer(id);
-                                                    if (p != null) {
-                                                        sb.append(p.getName().getString()).append(", ");
-                                                    } else {
-                                                        sb.append(id.toString().substring(0, 8)).append(", ");
-                                                    }
-                                                }
-                                                sb.setLength(sb.length() - 2);
-                                                src.sendFeedback(() -> Text.literal(sb.toString()), false);
+                                                return 1;
                                             }
+
+                                            List<String> memberNames = new ArrayList<>();
+                                            for (UUID id : members) {
+                                                ServerPlayerEntity online = src.getServer().getPlayerManager().getPlayer(id);
+                                                if (online != null) {
+                                                    memberNames.add(online.getName().getString());
+                                                } else {
+                                                    // Offline: show short UUID + offline indicator
+                                                    String shortId = id.toString().substring(0, 8);
+                                                    memberNames.add(shortId + " (offline)");
+                                                }
+                                            }
+                                            String message = "Members: " + String.join(", ", memberNames);
+                                            src.sendFeedback(() -> Text.literal(message), false);
                                             return 1;
                                         })
                                 )

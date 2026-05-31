@@ -11,10 +11,6 @@ on:
       - 'v*'
     paths:
       - 'src/**'
-      - 'build.gradle'
-      - 'gradle.properties'
-      - 'settings.gradle'
-      - '.github/workflows/publish.yml'
   release:
     types: [published]
 
@@ -42,22 +38,17 @@ jobs:
           if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" != "tag" ]]; then
             echo "IS_ALPHA=true" >> $GITHUB_ENV
             ALPHA_VERSION="${MOD_VERSION}-alpha.${GITHUB_SHA:0:7}"
-            # 标签加 v 前缀，例如 v1.1.1-alpha.c0f448f
             TAG_NAME="v${ALPHA_VERSION}"
             echo "UNPREFIXED_TAG=$TAG_NAME" >> $GITHUB_ENV
 
-            # Modrinth 版本号：主版本-前缀.短哈希+游戏版本fabric
             DEFAULT_GAME_VERSION="1.21.4"
             MODRINTH_VERSION="${ALPHA_VERSION}+${DEFAULT_GAME_VERSION}fabric"
             echo "MODRINTH_VERSION=$MODRINTH_VERSION" >> $GITHUB_ENV
             echo "VERSION_TYPE=alpha" >> $GITHUB_ENV
             echo "GAME_VERSIONS=$DEFAULT_GAME_VERSION" >> $GITHUB_ENV
-
-            # 显示名称
             RELEASE_NAME="Show My Item v${ALPHA_VERSION}"
             echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
 
-            # Alpha 更新日志
             cat << EOF > alpha_changelog.md
           > [!WARNING]
           > ⚠️ 这是一个自动构建的 Alpha 测试版本
@@ -74,7 +65,6 @@ jobs:
           else
             echo "IS_ALPHA=false" >> $GITHUB_ENV
             
-            # 正式版逻辑（tag 或 release）
             DEFAULT_GAME_VERSIONS='1.21.4'
             GAME_VERSIONS=$(printf '%s\n' "$COMMIT_MSG" \
               | grep -iEo 'game-versions:[[:space:]]*.*' \
@@ -191,8 +181,6 @@ jobs:
 
           with open('stable_changelog.md', 'w') as f:
               f.write(changelog)
-          with open(os.environ['GITHUB_ENV'], 'a') as f:
-              f.write("CHANGELOG_FILE=stable_changelog.md\n")
           EOF
         env:
           CURRENT_TAG: ${{ github.ref_name }}
@@ -279,7 +267,7 @@ jobs:
           name: ${{ env.RELEASE_NAME }}
           version: ${{ env.MODRINTH_VERSION }}
           version-type: ${{ env.VERSION_TYPE }}
-          changelog-file: ${{ env.CHANGELOG_FILE }}
+          changelog-file: ${{ github.workspace }}/${{ env.CHANGELOG_FILE }}
           loaders: fabric
           game-versions: ${{ env.GAME_VERSIONS }}
           files: ${{ env.RELEASE_JAR }}

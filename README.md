@@ -7,7 +7,7 @@
 <h3 align="center">Show My Item</h3>
 
   <p align="center">
-    Elegantly display the item in your hand in chat — making sharing easier!
+    Elegantly display your held item, inventory, or ender chest in chat — making sharing easier!
     <br />
     <a href="https://github.com/PhantomPixel-0418/ShowMyItem"><strong>Explore the docs »</strong></a>
     <br />
@@ -38,6 +38,7 @@
       </ul>
     </li>
     <li><a href="#usage">Usage</a></li>
+    <li><a href="#configuration">Configuration</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
@@ -50,18 +51,21 @@
 
 ![Show My Item Screenshot](https://github.com/PhantomPixel-0418/ShowMyItem/blob/master/images/screenshot.png?raw=true)
 
-**Show My Item** is a lightweight Minecraft Fabric mod that adds a fun little feature to chat: when you type `[item]` in chat, it automatically replaces it with the name of the item you're holding, and other players can hover over that name to **see the item's full details** (name, enchantments, durability, etc.).
+**Show My Item** is a lightweight Minecraft Fabric mod designed for servers. It allows players to share their held item, entire inventory, or ender chest in chat using simple placeholders like `[item]`, `[inventory]`, or `[enderchest]`. Other players can hover over item names to see full tooltips, or click links to view a read-only container of the shared inventory.
 
 **What problem does it solve?**
 
-- No more manually typing complicated item names or making your friends guess what you're holding.
-- Hover to reveal — no extra commands needed, making communication more intuitive.
-- Purely for sharing and showing off with friends, with no cheating or game-breaking elements.
+- No more manually typing complicated item names or making friends guess what you're holding.
+- Share your inventory or ender chest instantly without complicated commands.
+- Hover to see details, click to view the full inventory — communication becomes intuitive and visual.
+- Purely for sharing and showing off, with no cheating or game-breaking elements.
 
 **Why choose it?**
 
-- **Simple**: No configuration needed, just install and play.
-- **Lightweight**: Server-side only, no performance impact.
+- **Simple**: Natural language placeholders, works with both English and Chinese.
+- **Powerful**: Supports main hand, offhand, inventory (including armor and offhand), and ender chest.
+- **Configurable**: Carpet-like chat menu for adjusting expiration time, max snapshots, and language on the fly.
+- **Lightweight**: Server-side only; clients do not need to install the mod.
 - **Compatible**: Built on Fabric API, compatible with most mods.
 
 Of course, no mod can satisfy everyone. If you have any suggestions, feel free to open an Issue or Pull Request.
@@ -85,7 +89,7 @@ To use this mod on your server (or in singleplayer), follow these steps.
 
 - **Minecraft 1.21.4** server or client (if playing singleplayer).
 - **Fabric Loader** 0.16.9 or higher.
-- **Fabric API** (required on both server and client; however, this mod runs only server-side. If the client does not have it, hover effects won't show.)
+- **Fabric API** (required on server; not required on client, but having it doesn't hurt).
 
 ### Installation
 
@@ -94,58 +98,93 @@ To use this mod on your server (or in singleplayer), follow these steps.
 
 2. **Place the mod**  
    Put the JAR file into the `mods` folder of your server.  
-   *For singleplayer, put it into the client's `mods` folder.*
+   *For singleplayer, also put it into the client's `mods` folder (it will work on the integrated server).*
 
 3. **Start the game/server**  
-   No extra configuration needed — the mod will work automatically.
+   No extra configuration needed — the mod will work automatically, and a config file will be created at `config/showmyitem.json`.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 ## Usage
 
+### Placeholders
+
+The mod supports the following placeholders that can be used directly in chat (these are the English version placeholders; see the Chinese documentation for Chinese placeholders):
+
+| Placeholder    | Description                                                                           |
+| -------------- | ------------------------------------------------------------------------------------- |
+| `[item]`       | Main hand item                                                                        |
+| `[offhand]`    | Offhand item                                                                          |
+| `[inventory]`  | Share your entire inventory (including armor and offhand); generates a clickable link |
+| `[enderchest]` | Share your ender chest; generates a clickable link                                    |
+
+>[!NOTE]
+> Placeholders are independent of server language. You can use these English placeholders in any language environment. If you prefer Chinese, you can also use the Chinese equivalents `[物品]`, `[副手]`, `[背包]`, `[末影箱]`.
+
 ### Basic Usage
 
-1. Make sure you are holding any item (if empty-handed, it will show "Empty Hand").
-2. Type a message containing `[item]` in chat, for example:
-
-    ```text
-    Check this out! [item]
+1. Make sure you are holding an item.
+2. Type a message containing placeholders, for example:
     ```
+    Check this out! [item]
+    My inventory: [inventory]
+    My ender chest: [enderchest]
+    ```
+3. After sending, placeholders will be replaced with item names or clickable links.
+4. Other players can hover over item names to see tooltips, or click `[Player's Inventory]` / `[Player's Ender Chest]` to open a read-only view.
 
-3. After sending, the `[item]` in the message will be replaced with your main-hand item, formatted as `[Item Name]`.
-4. Other players can hover over `[Item Name]` to see the item's detailed tooltip (enchantments, durability, custom name, etc.).
+### Interaction Details
 
-### Example
+- **Hover**: Hovering over an item name shows its full tooltip (enchantments, durability, custom name, etc.).
+- **Click inventory/ender chest links**: Opens a secure, read-only container showing the target's main inventory, armor, offhand, or ender chest. Items cannot be moved or taken, preventing item duplication exploits.
+- **Permission**: Only the snapshot creator or OPs can open a link; others will receive an error message.
 
-*Before sending:*
-> Check this out! [item]
+<p align="right">(<a href="#top">back to top</a>)</p>
 
-*After sending (assuming you're holding an enchanted diamond sword):*
-> Check this out! [Diamond Sword]
->
-> *Hovering over "[Diamond Sword]" shows:*
->
-> ```
-> Diamond Sword
-> Sharpness IV
-> Unbreaking III
-> etc.
-> ```
+## Configuration
 
-### Notes
+The mod features a Carpet-like chat menu accessible via the `/showmyitem` command.
 
-- This mod is designed to work **server-side only** — the client does not need to install it.
+### Commands
+
+| Command                              | Description                        | Permission    |
+| ------------------------------------ | ---------------------------------- | ------------- |
+| `/showmyitem`                        | Show all settings and version info | Everyone      |
+| `/showmyitem category <category>`    | Show settings for a category       | Everyone      |
+| `/showmyitem find <query>`           | Fuzzy search for settings          | Everyone      |
+| `/showmyitem viewinv <snapshotID>`   | View inventory snapshot            | Creator or OP |
+| `/showmyitem viewender <snapshotID>` | View ender chest snapshot          | Creator or OP |
+| `/showmyitem set <key> <value>`      | Modify a config option             | OP (level 2)  |
+| `/showmyitem reloadconfig`           | Reload configuration from file     | OP (level 2)  |
+
+### Configuration Options
+
+Config file is located at `config/showmyitem.json`. You can edit it directly or change values in-game using the menu/commands:
+
+- `snapshotExpiryMs`: Expiration time for snapshots in milliseconds (default 300000 = 5 minutes).
+- `maxSnapshots`: Maximum number of snapshots stored at once (default 100).
+- `defaultLanguage`: Server default language, either `en_us` or `zh_cn`.
+
+After editing, use `/showmyitem reloadconfig` to apply changes without restarting.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 ## Roadmap
 
-- [x] Support offhand item display (e.g., `[offhand]` placeholder)
-- [ ] Add configuration options to customize display format (e.g., show stack size or not)
-- [x] Support more message types (e.g., /tell private messages)
-- [ ] Localization support (multiple languages)
+- [x] Main hand item display (`[item]`)
+- [x] Offhand item display (`[offhand]`)
+- [x] Inventory sharing with armor and offhand (`[背包]` / `[inventory]`)
+- [x] Ender chest sharing (`[末影箱]` / `[enderchest]`)
+- [x] Server-side only architecture
+- [x] Multi-language support (English / Chinese) with auto-detection of placeholders
+- [x] Carpet-style config menu with clickable settings
+- [x] Config hot-reload
+- [x] Secure read-only containers to prevent item duplication
+- [ ] Share more info: health, hunger, etc.
+- [ ] Share targeted block/entity
+- [ ] More language support
 
-Check the [open issues](https://github.com/PhantomPixel-0418/ShowMyItem/issues) for a full list of requested features and known issues.
+See [open issues](https://github.com/PhantomPixel-0418/ShowMyItem/issues) for a full list of requested features and known issues.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 

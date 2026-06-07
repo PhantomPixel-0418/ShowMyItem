@@ -1,0 +1,146 @@
+name: Publish Release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set version variables
+        run: |
+          TAG_NAME=${GITHUB_REF_NAME}
+          MOD_VERSION=${TAG_NAME#v}
+          echo "MOD_VERSION=$MOD_VERSION" >> $GITHUB_ENV
+          echo "UNPREFIXED_TAG=$MOD_VERSION" >> $GITHUB_ENV
+          echo "VERSION_TYPE=release" >> $GITHUB_ENV
+          RELEASE_NAME="Show My Item v${MOD_VERSION}"
+          echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
+
+          # 默认游戏版本（可通过 commit message 覆盖，但简单起见固定）
+          DEFAULT_GAME_VERSION="1.21.4"
+          MODRINTH_VERSION="${MOD_VERSION}+${DEFAULT_GAME_VERSION}fabric"
+          echo "MODRINTH_VERSION=$MODRINTH_VERSION" >> $GITHUB_ENV
+          echo "GAME_VERSIONS=$DEFAULT_GAME_VERSION" >> $GITHUB_ENV
+
+      - name: Generate changelog from commits
+        run: |
+          CURRENT_TAG=${GITHUB_REF_NAME}
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v '\-alpha' | grep -v '\-beta' | grep -B1 "^$CURRENT_TAG$" | head -n1)
+          if [ "$PREV_TAG" = "$CURRENT_TAG" ] || [ -z "$PREV_TAG" ]; then
+            PREV_TAG=""
+          fi
+          if [ -n "$PREV_TAG" ]; then
+            COMMIT_RANGE="$PREV_TAG..$CURRENT_TAG"
+          else
+            COMMIT_RANGE="HEAD"
+          fi
+          # 生成 changelog 的脚本（与之前类似，可复用）
+          python3 << EOF
+          import subprocess, re
+          from collections import defaultdict
+
+          commit_range = "$COMMIT_RANGE"
+          output = subprocess.check_output(['git', 'log', '--pretty=format:%s|%an', commit_range]).decode().strip()
+          commits = [line.split('|', 1) for line in output.split('\n')] if output else []
+
+          categories = {
+              'feat': ('✨ 新功能', []),
+              'fix': ('🐛 Bug 修复', []),
+              'docs': ('📝 文档', []),
+              'refactor': ('♻️ 重构', []),
+              'perf': ('⚡ 性能优化', []),
+              'chore': ('🔧 杂务', []),
+          }
+          other = []
+
+          for msg, author in commits:
+              m = re.match(r'^([a-z]+)(?:\([^)]+\))?:\s*(.*)', msg)
+              if m:
+                  typ, rest = m.groups()
+              else:
+                  typ, rest = None, msg
+              entry = f"- {rest} by **@{author}**"
+              if typ and typ in categories:
+                  categories[typ][1].append(entry)
+              else:
+                  other.append(entry)
+
+          changelog = f"## Changes in ${{ env.MOD_VERSION }}\n\n"
+          for typ, (title, entries) in categories.items():
+              if entries:
+                  changelog += f"### {title}\n" + "\n".join(entries) + "\n\n"
+          if other:
+              changelog += "### 📌 其他\n" + "\n".join(other) + "\n\n"
+          if not changelog.strip():
+              changelog = "## No changes recorded"
+
+          with open('changelog.md', 'w') as f:
+              f.write(changelog)
+          EOF
+        shell: bash
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Build with Gradle
+        run: chmod +x gradlew && ./gradlew clean build
+
+      - name: Find and prepare JAR
+        run: |
+          FINAL_JAR=$(find build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name '*.module.jar' | sort | head -n 1)
+          if [ -z "$FINAL_JAR" ]; then
+            echo "No final JAR found" >&2
+            exit 1
+          fi
+          NEW_NAME="showmyitem-${MODRINTH_VERSION}.jar"
+          cp "$FINAL_JAR" "build/libs/$NEW_NAME"
+          echo "RELEASE_JAR=build/libs/$NEW_NAME" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ env.RELEASE_NAME }}
+          body_path: changelog.md
+          draft: false
+          prerelease: false
+          files: ${{ env.RELEASE_JAR }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to Modrinth
+        uses: cloudnode-pro/modrinth-publish@v2
+        with:
+          token: ${{ secrets.MODRINTH_TOKEN }}
+          project: "pMKJZtiq"
+          name: ${{ env.RELEASE_NAME }}
+          version: ${{ env.MODRINTH_VERSION }}
+          version-type: ${{ env.VERSION_TYPE }}
+          changelog-file: ${{ github.workspace }}/changelog.md
+          loaders: fabric
+          game-versions: ${{ env.GAME_VERSIONS }}
+          files: ${{ env.RELEASE_JAR }}

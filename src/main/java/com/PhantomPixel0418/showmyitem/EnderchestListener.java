@@ -2,9 +2,7 @@ package com.PhantomPixel0418.showmyitem;
 
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.block.Blocks;
-import net.minecraft.inventory.EnderChestInventory;
 import net.minecraft.inventory.SimpleInventory;
-import net.minecraft.screen.SimpleNamedScreenHandlerFactory;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
@@ -21,7 +19,7 @@ public class EnderchestListener {
                     UUID playerId = player.getUuid();
                     UUID inviterId = manager.findInviter(playerId);
                     if (inviterId != null) {
-                        ServerPlayerEntity serverPlayer = (ServerPlayerEntity) player;
+                        if (!(player instanceof ServerPlayerEntity serverPlayer)) return ActionResult.PASS;
                         ServerPlayerEntity inviter = serverPlayer.getServer().getPlayerManager().getPlayer(inviterId);
                         if (inviter != null) {
                             openEnderChestForPlayer(serverPlayer, inviter);
@@ -37,16 +35,8 @@ public class EnderchestListener {
     }
 
     private static void openEnderChestForPlayer(ServerPlayerEntity viewer, ServerPlayerEntity owner) {
-        EnderChestInventory enderInv = owner.getEnderChestInventory();
-        int size = enderInv.size();
-        SimpleInventory tempInv = new SimpleInventory(size);
-        for (int i = 0; i < size; i++) {
-            tempInv.setStack(i, enderInv.getStack(i).copy());
-        }
+        SimpleInventory tempInv = InventoryUtils.copyEnderChest(owner.getEnderChestInventory());
         Text title = Text.literal(owner.getName().getString() + "'s Ender Chest");
-        viewer.openHandledScreen(new SimpleNamedScreenHandlerFactory(
-                (syncId, playerInv, player) -> new CustomInventoryScreenHandler(syncId, playerInv, tempInv),
-                title
-        ));
+        InventoryUtils.openCustomInventoryScreen(viewer, tempInv, title);
     }
 }

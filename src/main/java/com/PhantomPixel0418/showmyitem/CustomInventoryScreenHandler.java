@@ -53,12 +53,18 @@ public class CustomInventoryScreenHandler extends ScreenHandler {
         }
     }
 
+    private static final int SCREEN_HANDLER_MAX_9 = 9;
+    private static final int SCREEN_HANDLER_MAX_18 = 18;
+    private static final int SCREEN_HANDLER_MAX_27 = 27;
+    private static final int SCREEN_HANDLER_MAX_36 = 36;
+    private static final int SCREEN_HANDLER_MAX_45 = 45;
+
     private static ScreenHandlerType<?> getScreenHandlerType(int size) {
-        if (size <= 9) return ScreenHandlerType.GENERIC_9X1;
-        else if (size <= 18) return ScreenHandlerType.GENERIC_9X2;
-        else if (size <= 27) return ScreenHandlerType.GENERIC_9X3;
-        else if (size <= 36) return ScreenHandlerType.GENERIC_9X4;
-        else if (size <= 45) return ScreenHandlerType.GENERIC_9X5;
+        if (size <= SCREEN_HANDLER_MAX_9) return ScreenHandlerType.GENERIC_9X1;
+        else if (size <= SCREEN_HANDLER_MAX_18) return ScreenHandlerType.GENERIC_9X2;
+        else if (size <= SCREEN_HANDLER_MAX_27) return ScreenHandlerType.GENERIC_9X3;
+        else if (size <= SCREEN_HANDLER_MAX_36) return ScreenHandlerType.GENERIC_9X4;
+        else if (size <= SCREEN_HANDLER_MAX_45) return ScreenHandlerType.GENERIC_9X5;
         else return ScreenHandlerType.GENERIC_9X6;
     }
 

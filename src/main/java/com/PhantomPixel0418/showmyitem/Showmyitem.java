@@ -4,9 +4,14 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.message.v1.ServerMessageDecoratorEvent;
+import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.*;
+import net.minecraft.text.ClickEvent;
+import net.minecraft.text.HoverEvent;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Style;
+import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +25,10 @@ import java.util.stream.Collectors;
 public class Showmyitem implements ModInitializer {
     public static final String MOD_ID = "showmyitem";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+
+    private static final int TICK_INTERVAL = 1200;
+    private static final int MAIN_INVENTORY_SIZE = 36;
+    private static final int ARMOR_SLOT_COUNT = 4;
 
     @Override
     public void onInitialize() {
@@ -36,7 +45,7 @@ public class Showmyitem implements ModInitializer {
         });
 
         ServerTickEvents.END_SERVER_TICK.register(server -> {
-            if (server.getTicks() % 1200 == 0) {
+            if (server.getTicks() % TICK_INTERVAL == 0) {
                 InventorySnapshotManager.cleanExpired();
             }
         });
@@ -46,6 +55,7 @@ public class Showmyitem implements ModInitializer {
             String rawText = message.getString();
 
             List<String> placeholders = I18n.getPlaceholders(player);
+
             String regex = "\\[(" + placeholders.stream()
                     .map(Pattern::quote)
                     .collect(Collectors.joining("|")) + ")\\]";
@@ -74,12 +84,12 @@ public class Showmyitem implements ModInitializer {
                 } else if (placeholder.equals("offhand") || placeholder.equals(offhandPlace)) {
                     result.append(createItemComponent(player.getOffHandStack(), player));
                 } else if (placeholder.equals("inventory") || placeholder.equals(inventoryPlace) || placeholder.equals("背包")) {
-                    ItemStack[] inventory = new ItemStack[36];
-                    for (int i = 0; i < 36; i++) {
+                    ItemStack[] inventory = new ItemStack[MAIN_INVENTORY_SIZE];
+                    for (int i = 0; i < MAIN_INVENTORY_SIZE; i++) {
                         inventory[i] = player.getInventory().getStack(i).copy();
                     }
-                    ItemStack[] armor = new ItemStack[4];
-                    for (int i = 0; i < 4; i++) {
+                    ItemStack[] armor = new ItemStack[ARMOR_SLOT_COUNT];
+                    for (int i = 0; i < ARMOR_SLOT_COUNT; i++) {
                         armor[i] = player.getInventory().getArmorStack(i).copy();
                     }
                     ItemStack offhand = player.getOffHandStack().copy();
@@ -89,11 +99,10 @@ public class Showmyitem implements ModInitializer {
                             inventory, armor, offhand, playerName, player.getUuid());
                     result.append(createInventoryComponent(player, snapshotId));
                 } else if (placeholder.equals("enderchest") || placeholder.equals(enderPlace) || placeholder.equals("末影箱")) {
-                    var enderInv = player.getEnderChestInventory();
-                    int size = enderInv.size();
-                    ItemStack[] enderItems = new ItemStack[size];
-                    for (int i = 0; i < size; i++) {
-                        enderItems[i] = enderInv.getStack(i).copy();
+                    SimpleInventory tempEnder = InventoryUtils.copyEnderChest(player.getEnderChestInventory());
+                    ItemStack[] enderItems = new ItemStack[tempEnder.size()];
+                    for (int i = 0; i < enderItems.length; i++) {
+                        enderItems[i] = tempEnder.getStack(i);
                     }
 
                     String playerName = player.getName().getString();

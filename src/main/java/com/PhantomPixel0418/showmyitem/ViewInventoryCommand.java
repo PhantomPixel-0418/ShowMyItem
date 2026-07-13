@@ -8,20 +8,46 @@ import net.fabricmc.loader.api.ModContainer;
 import net.minecraft.command.CommandRegistryAccess;
 import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.item.ItemStack;
-import net.minecraft.screen.SimpleNamedScreenHandlerFactory;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.*;
+import net.minecraft.text.ClickEvent;
+import net.minecraft.text.HoverEvent;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Style;
+import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import java.util.*;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 public class ViewInventoryCommand {
+    private static final int COMBINED_INVENTORY_SIZE = 41;
+    private static final int ENDER_CHEST_SIZE = 27;
+    private static final long MIN_SNAPSHOT_EXPIRY_MS = 1000;
 
     private static final Map<String, List<String>> CATEGORIES = new LinkedHashMap<>();
     static {
         CATEGORIES.put("general", Arrays.asList("defaultLanguage"));
         CATEGORIES.put("snapshot", Arrays.asList("snapshotExpiryMs", "maxSnapshots"));
+    }
+
+    // Helper method to validate and retrieve snapshot
+    private static int validateSnapshot(UUID snapshotId, ServerPlayerEntity player, ServerCommandSource source) {
+        InventorySnapshot snapshot = InventorySnapshotManager.getSnapshotObject(snapshotId);
+        if (snapshot == null) {
+            long minutes = ModConfig.getInstance().snapshotExpiryMs / 60000;
+            source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.snapshot_expired", minutes)));
+            return 0;
+        }
+        if (!player.getUuid().equals(snapshot.getCreatorUUID()) && !player.hasPermissionLevel(2)) {
+            source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.not_creator")));
+            return 0;
+        }
+        return 1;
     }
 
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher,
@@ -64,7 +90,7 @@ public class ViewInventoryCommand {
         );
     }
 
-    // ---------- 菜单相关 ----------
+    // ---------- Menu ----------
     private static int showAll(CommandContext<ServerCommandSource> context) {
         ServerCommandSource source = context.getSource();
         ServerPlayerEntity player = source.getPlayer();
@@ -228,7 +254,7 @@ public class ViewInventoryCommand {
         return line;
     }
 
-    // ---------- 背包查看（41格）----------
+    // ---------- Inventory View (41 slots) ----------
     private static int viewInventory(CommandContext<ServerCommandSource> context) {
         String snapshotIdStr = StringArgumentType.getString(context, "snapshot");
         ServerCommandSource source = context.getSource();
@@ -244,40 +270,30 @@ public class ViewInventoryCommand {
             source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.invalid_snapshot")));
             return 0;
         }
+
+        if (validateSnapshot(snapshotId, player, source) != 1) return 0;
+
         InventorySnapshot snapshot = InventorySnapshotManager.getSnapshotObject(snapshotId);
-        if (snapshot == null) {
-            long minutes = ModConfig.getInstance().snapshotExpiryMs / 60000;
-            source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.snapshot_expired", minutes)));
-            return 0;
-        }
-        if (!player.getUuid().equals(snapshot.getCreatorUUID()) && !player.hasPermissionLevel(2)) {
-            source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.not_creator")));
-            return 0;
-        }
+        ItemStack[] mainItems = snapshot.getItems();
+        ItemStack[] armorItems = snapshot.getArmor();
+        ItemStack offhandItem = snapshot.getOffhand();
 
-        ItemStack[] mainItems = snapshot.getItems();   // 36格
-        ItemStack[] armorItems = snapshot.getArmor();  // 4格
-        ItemStack offhandItem = snapshot.getOffhand(); // 1格
-
-        SimpleInventory combinedInventory = new SimpleInventory(41);
-        for (int i = 0; i < 36; i++) {
+        SimpleInventory combinedInventory = new SimpleInventory(COMBINED_INVENTORY_SIZE);
+        for (int i = 0; i < InventorySnapshot.MAIN_INVENTORY_SLOTS; i++) {
             combinedInventory.setStack(i, mainItems[i].copy());
         }
-        for (int i = 0; i < 4; i++) {
-            combinedInventory.setStack(36 + i, armorItems[i].copy());
+        for (int i = 0; i < InventorySnapshot.ARMOR_SLOTS; i++) {
+            combinedInventory.setStack(InventorySnapshot.MAIN_INVENTORY_SLOTS + i, armorItems[i].copy());
         }
-        combinedInventory.setStack(40, offhandItem.copy());
+        combinedInventory.setStack(InventorySnapshot.OFFHAND_SLOT_INDEX, offhandItem.copy());
 
         String playerName = snapshot.getPlayerName();
         Text title = Text.literal(I18n.translate(player, "text.showmyitem.inventory_title", playerName));
-        player.openHandledScreen(new SimpleNamedScreenHandlerFactory(
-                (syncId, playerInv, p) -> new CustomInventoryScreenHandler(syncId, playerInv, combinedInventory),
-                title
-        ));
+        InventoryUtils.openCustomInventoryScreen(player, combinedInventory, title);
         return 1;
     }
 
-    // ---------- 末影箱查看（27格）----------
+    // ---------- Ender Chest View (27 slots) ----------
     private static int viewEnderChest(CommandContext<ServerCommandSource> context) {
         String snapshotIdStr = StringArgumentType.getString(context, "snapshot");
         ServerCommandSource source = context.getSource();
@@ -293,33 +309,24 @@ public class ViewInventoryCommand {
             source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.invalid_snapshot")));
             return 0;
         }
-        InventorySnapshot snapshot = InventorySnapshotManager.getSnapshotObject(snapshotId);
-        if (snapshot == null) {
-            long minutes = ModConfig.getInstance().snapshotExpiryMs / 60000;
-            source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.snapshot_expired", minutes)));
-            return 0;
-        }
-        if (!player.getUuid().equals(snapshot.getCreatorUUID()) && !player.hasPermissionLevel(2)) {
-            source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.not_creator")));
-            return 0;
-        }
 
-        ItemStack[] enderItems = snapshot.getItems();  // 27格
-        SimpleInventory inv = new SimpleInventory(27);
-        for (int i = 0; i < 27; i++) {
+        if (validateSnapshot(snapshotId, player, source) != 1) return 0;
+
+        InventorySnapshot snapshot = InventorySnapshotManager.getSnapshotObject(snapshotId);
+        ItemStack[] enderItems = snapshot.getItems();
+
+        SimpleInventory inv = new SimpleInventory(ENDER_CHEST_SIZE);
+        for (int i = 0; i < ENDER_CHEST_SIZE; i++) {
             inv.setStack(i, enderItems[i].copy());
         }
 
         String playerName = snapshot.getPlayerName();
         Text title = Text.literal(I18n.translate(player, "text.showmyitem.enderchest_title", playerName));
-        player.openHandledScreen(new SimpleNamedScreenHandlerFactory(
-                (syncId, playerInv, p) -> new CustomInventoryScreenHandler(syncId, playerInv, inv),
-                title
-        ));
+        InventoryUtils.openCustomInventoryScreen(player, inv, title);
         return 1;
     }
 
-    // ---------- 配置相关 ----------
+    // ---------- Configuration ----------
     private static int reloadConfig(CommandContext<ServerCommandSource> context) {
         ServerCommandSource source = context.getSource();
         ServerPlayerEntity player = source.getPlayer();
@@ -339,7 +346,7 @@ public class ViewInventoryCommand {
             switch (key) {
                 case "snapshotExpiryMs" -> {
                     long ms = Long.parseLong(valueStr);
-                    if (ms < 1000) throw new NumberFormatException("too small");
+                    if (ms < MIN_SNAPSHOT_EXPIRY_MS) throw new NumberFormatException("too small");
                     config.snapshotExpiryMs = ms;
                 }
                 case "maxSnapshots" -> {

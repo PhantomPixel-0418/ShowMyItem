@@ -3,9 +3,7 @@ package com.PhantomPixel0418.showmyitem;
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
-import net.minecraft.inventory.EnderChestInventory;
 import net.minecraft.inventory.SimpleInventory;
-import net.minecraft.screen.SimpleNamedScreenHandlerFactory;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -112,17 +110,9 @@ public class EnderchestShareCommand {
                                                         return 0;
                                                     }
 
-                                                    EnderChestInventory enderInv = owner.getEnderChestInventory();
-                                                    int size = enderInv.size();
-                                                    SimpleInventory tempInv = new SimpleInventory(size);
-                                                    for (int i = 0; i < size; i++) {
-                                                        tempInv.setStack(i, enderInv.getStack(i).copy());
-                                                    }
+                                                    SimpleInventory tempInv = InventoryUtils.copyEnderChest(owner.getEnderChestInventory());
                                                     Text title = Text.literal(owner.getName().getString() + "'s Ender Chest");
-                                                    opener.openHandledScreen(new SimpleNamedScreenHandlerFactory(
-                                                            (syncId, playerInv, player) -> new CustomInventoryScreenHandler(syncId, playerInv, tempInv),
-                                                            title
-                                                    ));
+                                                    InventoryUtils.openCustomInventoryScreen(opener, tempInv, title);
                                                     src.sendFeedback(() -> Text.literal("Opened ender chest of " + targetName), false);
                                                     return 1;
                                                 })

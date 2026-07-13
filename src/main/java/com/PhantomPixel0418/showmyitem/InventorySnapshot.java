@@ -4,10 +4,14 @@ import net.minecraft.item.ItemStack;
 import java.util.UUID;
 
 public class InventorySnapshot {
+    public static final int MAIN_INVENTORY_SLOTS = 36;
+    public static final int ARMOR_SLOTS = 4;
+    public static final int OFFHAND_SLOT_INDEX = 40;
+
     private final UUID id;
-    private final ItemStack[] items;          // 主物品栏 36 格
-    private final ItemStack[] armor;          // 盔甲 4 格
-    private final ItemStack offhand;          // 副手 1 格
+    private final ItemStack[] items;
+    private final ItemStack[] armor;
+    private final ItemStack offhand;
     private final long timestamp;
     private final String playerName;
     private final UUID creatorUUID;

@@ -74,5 +74,5 @@ local.properties
 run/
 logs/
 
-# Specific to your project (adjust if needed)
-# 如果你的模组生成了一些临时文件或配置文件，可以在这里添加
+# Claude Code
+.claude/

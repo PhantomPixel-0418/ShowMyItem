@@ -35,6 +35,29 @@ public class InventorySnapshotManager {
         }
     }
 
+    public static UUID storeShulkerBoxSnapshot(ItemStack[] items, String playerName, UUID creatorUUID) {
+        ModConfig config = ModConfig.getInstance();
+        synchronized (SNAPSHOTS) {
+            if (SNAPSHOTS.size() >= config.maxSnapshots) {
+                UUID oldestId = null;
+                for (UUID id : CREATION_ORDER) {
+                    if (SNAPSHOTS.containsKey(id)) {
+                        oldestId = id;
+                        break;
+                    }
+                }
+                if (oldestId != null) {
+                    SNAPSHOTS.remove(oldestId);
+                    CREATION_ORDER.remove(oldestId);
+                }
+            }
+            InventorySnapshot snapshot = new InventorySnapshot(items, InventorySnapshot.Type.SHULKER_BOX, playerName, creatorUUID);
+            SNAPSHOTS.put(snapshot.getId(), snapshot);
+            CREATION_ORDER.add(snapshot.getId());
+            return snapshot.getId();
+        }
+    }
+
     public static ItemStack[] getSnapshot(UUID id) {
         InventorySnapshot snapshot = getSnapshotObject(id);
         return snapshot != null ? snapshot.getItems() : null;

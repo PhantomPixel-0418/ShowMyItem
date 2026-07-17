@@ -274,6 +274,13 @@ public class ViewInventoryCommand {
         if (validateSnapshot(snapshotId, player, source) != 1) return 0;
 
         InventorySnapshot snapshot = InventorySnapshotManager.getSnapshotObject(snapshotId);
+        InventorySnapshot.Type type = snapshot.getType();
+
+        if (type == InventorySnapshot.Type.ENDER_CHEST || type == InventorySnapshot.Type.SHULKER_BOX) {
+            return view27Slots(snapshotIdStr, snapshot, player, source, type);
+        }
+
+        // INVENTORY type — 41 slots
         ItemStack[] mainItems = snapshot.getItems();
         ItemStack[] armorItems = snapshot.getArmor();
         ItemStack offhandItem = snapshot.getOffhand();
@@ -290,6 +297,42 @@ public class ViewInventoryCommand {
         String playerName = snapshot.getPlayerName();
         Text title = Text.literal(I18n.translate(player, "text.showmyitem.inventory_title", playerName));
         InventoryUtils.openCustomInventoryScreen(player, combinedInventory, title);
+        return 1;
+    }
+
+    private static int view27Slots(String snapshotIdStr, InventorySnapshot snapshot,
+                                    ServerPlayerEntity player, ServerCommandSource source,
+                                    InventorySnapshot.Type type) {
+        if (type == InventorySnapshot.Type.ENDER_CHEST) {
+            return viewEnderChestDirect(snapshotIdStr, snapshot, player, source);
+        }
+        // SHULKER_BOX
+        return viewShulkerBoxDirect(snapshotIdStr, snapshot, player, source);
+    }
+
+    private static int viewEnderChestDirect(String snapshotIdStr, InventorySnapshot snapshot,
+                                             ServerPlayerEntity player, ServerCommandSource source) {
+        ItemStack[] enderItems = snapshot.getItems();
+        SimpleInventory inv = new SimpleInventory(ENDER_CHEST_SIZE);
+        for (int i = 0; i < ENDER_CHEST_SIZE; i++) {
+            inv.setStack(i, enderItems[i].copy());
+        }
+        String playerName = snapshot.getPlayerName();
+        Text title = Text.literal(I18n.translate(player, "text.showmyitem.enderchest_title", playerName));
+        InventoryUtils.openCustomInventoryScreen(player, inv, title);
+        return 1;
+    }
+
+    private static int viewShulkerBoxDirect(String snapshotIdStr, InventorySnapshot snapshot,
+                                             ServerPlayerEntity player, ServerCommandSource source) {
+        ItemStack[] shulkerItems = snapshot.getItems();
+        SimpleInventory inv = new SimpleInventory(ENDER_CHEST_SIZE);
+        for (int i = 0; i < ENDER_CHEST_SIZE; i++) {
+            inv.setStack(i, shulkerItems[i].copy());
+        }
+        String playerName = snapshot.getPlayerName();
+        Text title = Text.literal(I18n.translate(player, "text.showmyitem.shulkerbox_title", playerName));
+        InventoryUtils.openCustomInventoryScreen(player, inv, title);
         return 1;
     }
 
@@ -313,17 +356,7 @@ public class ViewInventoryCommand {
         if (validateSnapshot(snapshotId, player, source) != 1) return 0;
 
         InventorySnapshot snapshot = InventorySnapshotManager.getSnapshotObject(snapshotId);
-        ItemStack[] enderItems = snapshot.getItems();
-
-        SimpleInventory inv = new SimpleInventory(ENDER_CHEST_SIZE);
-        for (int i = 0; i < ENDER_CHEST_SIZE; i++) {
-            inv.setStack(i, enderItems[i].copy());
-        }
-
-        String playerName = snapshot.getPlayerName();
-        Text title = Text.literal(I18n.translate(player, "text.showmyitem.enderchest_title", playerName));
-        InventoryUtils.openCustomInventoryScreen(player, inv, title);
-        return 1;
+        return view27Slots(snapshotIdStr, snapshot, player, source, InventorySnapshot.Type.ENDER_CHEST);
     }
 
     // ---------- Configuration ----------

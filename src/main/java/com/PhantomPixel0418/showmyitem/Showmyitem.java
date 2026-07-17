@@ -4,6 +4,8 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.message.v1.ServerMessageDecoratorEvent;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.ContainerComponent;
 import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -16,6 +18,7 @@ import net.minecraft.util.Formatting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -137,6 +140,12 @@ public class Showmyitem implements ModInitializer {
                     ));
         }
 
+        // Check if this is a shulker box (regardless of contents)
+        ContainerComponent container = stack.get(DataComponentTypes.CONTAINER);
+        if (container != null) {
+            return createShulkerBoxComponent(player, stack, container);
+        }
+
         MutableText itemName = stack.getName().copy();
         int count = stack.getCount();
         int maxCount = stack.getMaxCount();
@@ -159,6 +168,50 @@ public class Showmyitem implements ModInitializer {
 
         Text leftBracket = Text.literal("[").setStyle(hoverStyle);
         Text rightBracket = Text.literal("]").setStyle(hoverStyle);
+
+        return Text.empty()
+                .append(leftBracket)
+                .append(itemWithCount)
+                .append(rightBracket);
+    }
+
+    private Text createShulkerBoxComponent(ServerPlayerEntity player, ItemStack shulkerStack, ContainerComponent container) {
+        List<ItemStack> stacks = container.stream().toList();
+        ItemStack[] items = new ItemStack[27];
+        for (int i = 0; i < stacks.size() && i < 27; i++) {
+            items[i] = stacks.get(i).copy();
+        }
+
+        String playerName = player.getName().getString();
+        UUID snapshotId = InventorySnapshotManager.storeShulkerBoxSnapshot(
+                items, playerName, player.getUuid());
+
+        // Build the shulker box display text with both hover and click
+        HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_ITEM,
+                new HoverEvent.ItemStackContent(shulkerStack));
+        Style clickStyle = Style.EMPTY
+                .withHoverEvent(hoverEvent)
+                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
+                        "/showmyitem viewinv " + snapshotId.toString()));
+
+        MutableText itemName = shulkerStack.getName().copy();
+        int count = shulkerStack.getCount();
+        int maxCount = shulkerStack.getMaxCount();
+        String suffix = (maxCount == 1) ? "" : " ✕" + count;
+
+        MutableText itemNameWithClick = itemName.setStyle(clickStyle);
+        MutableText itemWithCount;
+        if (suffix.isEmpty()) {
+            itemWithCount = itemNameWithClick;
+        } else {
+            Text countText = Text.literal(suffix)
+                    .formatted(Formatting.GRAY, Formatting.ITALIC)
+                    .setStyle(clickStyle);
+            itemWithCount = itemNameWithClick.append(countText);
+        }
+
+        MutableText leftBracket = Text.literal("[").setStyle(clickStyle);
+        MutableText rightBracket = Text.literal("]").setStyle(clickStyle);
 
         return Text.empty()
                 .append(leftBracket)

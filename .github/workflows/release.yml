@@ -36,7 +36,7 @@ jobs:
       - name: Generate changelog from commits
         run: |
           CURRENT_TAG=${GITHUB_REF_NAME}
-          PREV_TAG=$(git tag --sort=-v:refname | grep -v '\-alpha' | grep -v '\-beta' | grep -B1 "^$CURRENT_TAG$" | head -n1)
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v '\-alpha' | grep -v '\-beta' | grep '^v[0-9]' | awk -v tag="$CURRENT_TAG" '$0 == tag {getline; print; exit}')
           if [ "$PREV_TAG" = "$CURRENT_TAG" ] || [ -z "$PREV_TAG" ]; then
             PREV_TAG=""
           fi

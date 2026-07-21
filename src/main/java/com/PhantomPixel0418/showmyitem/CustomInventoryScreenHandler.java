@@ -112,7 +112,7 @@ public class CustomInventoryScreenHandler extends ScreenHandler {
 
             // Restore client side state
             this.setCursorStack(cursorBefore);
-            player.getInventory().offHand.set(0, offhandBefore);
+            player.getInventory().setStack(45, offhandBefore);
 
             if (player instanceof ServerPlayerEntity serverPlayer) {
                 // Send offhand equipment update to client

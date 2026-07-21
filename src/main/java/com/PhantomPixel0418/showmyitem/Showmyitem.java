@@ -19,7 +19,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -93,7 +92,7 @@ public class Showmyitem implements ModInitializer {
                     }
                     ItemStack[] armor = new ItemStack[ARMOR_SLOT_COUNT];
                     for (int i = 0; i < ARMOR_SLOT_COUNT; i++) {
-                        armor[i] = player.getInventory().getArmorStack(i).copy();
+                        armor[i] = player.getInventory().getStack(5 + i).copy();
                     }
                     ItemStack offhand = player.getOffHandStack().copy();
 
@@ -135,8 +134,7 @@ public class Showmyitem implements ModInitializer {
             return Text.literal(empty)
                     .formatted(Formatting.RED)
                     .setStyle(Style.EMPTY.withHoverEvent(
-                            new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                                    Text.literal(noItem).formatted(Formatting.RED))
+                            new HoverEvent.ShowText(Text.literal(noItem).formatted(Formatting.RED))
                     ));
         }
 
@@ -151,8 +149,7 @@ public class Showmyitem implements ModInitializer {
         int maxCount = stack.getMaxCount();
 
         String suffix = (maxCount == 1) ? "" : " ✕" + count;
-        HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_ITEM,
-                new HoverEvent.ItemStackContent(stack));
+        HoverEvent.ShowItem hoverEvent = new HoverEvent.ShowItem(stack);
         Style hoverStyle = Style.EMPTY.withHoverEvent(hoverEvent);
 
         MutableText itemNameWithHover = itemName.setStyle(hoverStyle);
@@ -187,12 +184,10 @@ public class Showmyitem implements ModInitializer {
                 items, playerName, player.getUuid());
 
         // Build the shulker box display text with both hover and click
-        HoverEvent hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_ITEM,
-                new HoverEvent.ItemStackContent(shulkerStack));
+        HoverEvent.ShowItem hoverEvent = new HoverEvent.ShowItem(shulkerStack);
         Style clickStyle = Style.EMPTY
                 .withHoverEvent(hoverEvent)
-                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
-                        "/showmyitem viewinv " + snapshotId.toString()));
+                .withClickEvent(new ClickEvent.RunCommand("/showmyitem viewinv " + snapshotId.toString()));
 
         MutableText itemName = shulkerStack.getName().copy();
         int count = shulkerStack.getCount();
@@ -226,10 +221,8 @@ public class Showmyitem implements ModInitializer {
 
         return Text.literal(linkText)
                 .setStyle(Style.EMPTY
-                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
-                                "/showmyitem viewinv " + snapshotId.toString()))
-                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                                Text.literal(hoverText))));
+                .withClickEvent(new ClickEvent.RunCommand("/showmyitem viewinv " + snapshotId.toString()))
+                .withHoverEvent(new HoverEvent.ShowText(Text.literal(hoverText))));
     }
 
     private Text createEnderChestComponent(ServerPlayerEntity player, UUID snapshotId) {
@@ -239,9 +232,7 @@ public class Showmyitem implements ModInitializer {
 
         return Text.literal(linkText)
                 .setStyle(Style.EMPTY
-                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
-                                "/showmyitem viewender " + snapshotId.toString()))
-                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                                Text.literal(hoverText))));
+                .withClickEvent(new ClickEvent.RunCommand("/showmyitem viewender " + snapshotId.toString()))
+                .withHoverEvent(new HoverEvent.ShowText(Text.literal(hoverText))));
     }
 }

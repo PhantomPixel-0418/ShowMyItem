@@ -194,10 +194,8 @@ public class ViewInventoryCommand {
                 String val = config.snapshotExpiryMs + " ms";
                 MutableText valueText = Text.literal(val).formatted(Formatting.YELLOW);
                 Style editStyle = Style.EMPTY
-                        .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
-                                "/showmyitem set snapshotExpiryMs "))
-                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                                Text.literal(I18n.translate(player, "text.showmyitem.click_to_edit"))));
+                        .withClickEvent(new ClickEvent.SuggestCommand("/showmyitem set snapshotExpiryMs "))
+                        .withHoverEvent(new HoverEvent.ShowText(Text.literal(I18n.translate(player, "text.showmyitem.click_to_edit"))));
                 valueText.setStyle(editStyle);
                 line.append(valueText);
             }
@@ -205,10 +203,8 @@ public class ViewInventoryCommand {
                 String val = String.valueOf(config.maxSnapshots);
                 MutableText valueText = Text.literal(val).formatted(Formatting.YELLOW);
                 Style editStyle = Style.EMPTY
-                        .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
-                                "/showmyitem set maxSnapshots "))
-                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                                Text.literal(I18n.translate(player, "text.showmyitem.click_to_edit"))));
+                        .withClickEvent(new ClickEvent.SuggestCommand("/showmyitem set maxSnapshots "))
+                        .withHoverEvent(new HoverEvent.ShowText(Text.literal(I18n.translate(player, "text.showmyitem.click_to_edit"))));
                 valueText.setStyle(editStyle);
                 line.append(valueText);
             }
@@ -226,10 +222,8 @@ public class ViewInventoryCommand {
         MutableText button = Text.empty().append(bracket).append(content).append(bracketClose);
         if (!active) {
             button.setStyle(Style.EMPTY
-                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
-                            "/showmyitem set defaultLanguage " + lang))
-                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                            Text.literal(I18n.translate(player, "text.showmyitem.switch_to", lang)))));
+                    .withClickEvent(new ClickEvent.RunCommand("/showmyitem set defaultLanguage " + lang))
+                    .withHoverEvent(new HoverEvent.ShowText(Text.literal(I18n.translate(player, "text.showmyitem.switch_to", lang)))));
         }
         return button;
     }
@@ -244,10 +238,8 @@ public class ViewInventoryCommand {
 
             MutableText button = Text.empty().append(bracket).append(catText).append(bracketClose);
             button.setStyle(Style.EMPTY
-                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
-                            "/showmyitem category " + catKey))
-                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                            Text.literal(I18n.translate(player, "text.showmyitem.list_category_hint", catName)))));
+                    .withClickEvent(new ClickEvent.RunCommand("/showmyitem category " + catKey))
+                    .withHoverEvent(new HoverEvent.ShowText(Text.literal(I18n.translate(player, "text.showmyitem.list_category_hint", catName)))));
             line.append(button);
             line.append(Text.literal(" "));
         }
@@ -301,8 +293,8 @@ public class ViewInventoryCommand {
     }
 
     private static int view27Slots(String snapshotIdStr, InventorySnapshot snapshot,
-                                    ServerPlayerEntity player, ServerCommandSource source,
-                                    InventorySnapshot.Type type) {
+                                   ServerPlayerEntity player, ServerCommandSource source,
+                                   InventorySnapshot.Type type) {
         if (type == InventorySnapshot.Type.ENDER_CHEST) {
             return viewEnderChestDirect(snapshotIdStr, snapshot, player, source);
         }
@@ -311,7 +303,7 @@ public class ViewInventoryCommand {
     }
 
     private static int viewEnderChestDirect(String snapshotIdStr, InventorySnapshot snapshot,
-                                             ServerPlayerEntity player, ServerCommandSource source) {
+                                            ServerPlayerEntity player, ServerCommandSource source) {
         ItemStack[] enderItems = snapshot.getItems();
         SimpleInventory inv = new SimpleInventory(ENDER_CHEST_SIZE);
         for (int i = 0; i < ENDER_CHEST_SIZE; i++) {
@@ -324,7 +316,7 @@ public class ViewInventoryCommand {
     }
 
     private static int viewShulkerBoxDirect(String snapshotIdStr, InventorySnapshot snapshot,
-                                             ServerPlayerEntity player, ServerCommandSource source) {
+                                            ServerPlayerEntity player, ServerCommandSource source) {
         ItemStack[] shulkerItems = snapshot.getItems();
         SimpleInventory inv = new SimpleInventory(ENDER_CHEST_SIZE);
         for (int i = 0; i < ENDER_CHEST_SIZE; i++) {

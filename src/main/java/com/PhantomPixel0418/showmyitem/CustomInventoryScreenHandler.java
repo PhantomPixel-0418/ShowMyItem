@@ -24,7 +24,7 @@ public class CustomInventoryScreenHandler extends ScreenHandler {
         this.inventory = targetInventory;
         inventory.onOpen(playerInventory.player);
 
-        int invSize = inventory.size();
+        int invSize = targetInventory.size();
         int rows = (invSize + 8) / 9;
 
         // Container slots (read-only)
@@ -32,16 +32,16 @@ public class CustomInventoryScreenHandler extends ScreenHandler {
             for (int col = 0; col < 9; col++) {
                 int index = row * 9 + col;
                 if (index < invSize) {
-                    this.addSlot(new ReadOnlySlot(inventory, index, 8 + col * 18, 18 + row * 18));
+                    this.addSlot(new ReadOnlySlot(targetInventory, index, 8 + col * 18, 18 + row * 18));
                 } else {
-                    // Use EmptyInventory singleton to avoid sharing mutable instances
                     this.addSlot(new ReadOnlySlot(EmptyInventory.INSTANCE, 0, 8 + col * 18, 18 + row * 18));
                 }
             }
         }
 
-        // Player inventory
-        int playerInvY = 18 + rows * 18 + 4;
+        // Player inventory — offset based on container rows to avoid overlapping read-only slots
+        // GenericContainerScreen formula: rows * 18 + 17
+        int playerInvY = Math.max(89, rows * 18 + 17);
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
                 this.addSlot(new Slot(playerInventory, col + row * 9 + 9, 8 + col * 18, playerInvY + row * 18));

@@ -7,6 +7,7 @@ import net.fabricmc.fabric.api.message.v1.ServerMessageDecoratorEvent;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.ContainerComponent;
 import net.minecraft.inventory.SimpleInventory;
+import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.ClickEvent;
@@ -86,15 +87,21 @@ public class Showmyitem implements ModInitializer {
                 } else if (placeholder.equals("offhand") || placeholder.equals(offhandPlace)) {
                     result.append(createItemComponent(player.getOffHandStack(), player));
                 } else if (placeholder.equals("inventory") || placeholder.equals(inventoryPlace) || placeholder.equals("背包")) {
+                    // 1.21.5 API: getMainStacks() returns StackList<ItemStack> for main inventory (36 slots)
+                    // Armor/offhand via player.getEquippedStack(EquipmentSlot)
                     ItemStack[] inventory = new ItemStack[MAIN_INVENTORY_SIZE];
-                    for (int i = 0; i < MAIN_INVENTORY_SIZE; i++) {
-                        inventory[i] = player.getInventory().getStack(i).copy();
+                    var mainStacks = player.getInventory().getMainStacks();
+                    for (int i = 0; i < MAIN_INVENTORY_SIZE && i < mainStacks.size(); i++) {
+                        inventory[i] = mainStacks.get(i).copy();
                     }
                     ItemStack[] armor = new ItemStack[ARMOR_SLOT_COUNT];
-                    for (int i = 0; i < ARMOR_SLOT_COUNT; i++) {
-                        armor[i] = player.getInventory().getStack(5 + i).copy();
-                    }
-                    ItemStack offhand = player.getOffHandStack().copy();
+                    // EquipmentSlot values in order: HEAD, CHEST, LEGS, FEET, ...
+                    // Yarn naming: FEET(boots), LEGS(leggings), CHEST(chestplate), HEAD(helmet)
+                    armor[0] = player.getEquippedStack(EquipmentSlot.FEET).copy();
+                    armor[1] = player.getEquippedStack(EquipmentSlot.LEGS).copy();
+                    armor[2] = player.getEquippedStack(EquipmentSlot.CHEST).copy();
+                    armor[3] = player.getEquippedStack(EquipmentSlot.HEAD).copy();
+                    ItemStack offhand = player.getEquippedStack(EquipmentSlot.OFFHAND).copy();
 
                     String playerName = player.getName().getString();
                     UUID snapshotId = InventorySnapshotManager.storeSnapshot(

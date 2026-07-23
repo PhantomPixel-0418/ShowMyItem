@@ -20,18 +20,29 @@ jobs:
       - name: Set version variables
         run: |
           TAG_NAME=${GITHUB_REF_NAME}
-          MOD_VERSION=${TAG_NAME#v}
-          echo "MOD_VERSION=$MOD_VERSION" >> $GITHUB_ENV
-          echo "UNPREFIXED_TAG=$MOD_VERSION" >> $GITHUB_ENV
-          echo "VERSION_TYPE=release" >> $GITHUB_ENV
-          RELEASE_NAME="Show My Item v${MOD_VERSION}"
-          echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
+          # 去掉 v 前缀，得到原始版本号字符串
+          RAW_VERSION="${TAG_NAME#v}"
 
-          # 默认游戏版本（可通过 commit message 覆盖，但简单起见固定）
-          DEFAULT_GAME_VERSION="1.21.5"
-          MODRINTH_VERSION="${MOD_VERSION}+${DEFAULT_GAME_VERSION}fabric"
+          # 从原始版本中提取游戏版本（如果有 + 分隔符）
+          if [[ "$RAW_VERSION" == *"+"* ]]; then
+            GAME_VERSION="${RAW_VERSION##*+}"
+            MOD_VERSION="${RAW_VERSION%%+*}"
+          else
+            # 没有 + 时，默认从 gradle.properties 读取游戏版本
+            GAME_VERSION=$(grep 'minecraft_version' gradle.properties | cut -d= -f2- | tr -d '[:space:]')
+            MOD_VERSION="$RAW_VERSION"
+          fi
+
+          MODRINTH_VERSION="${MOD_VERSION}+${GAME_VERSION}fabric"
+          VERSION_TYPE=release
+          RELEASE_NAME="Show My Item v${MOD_VERSION}"
+
+          echo "MOD_VERSION=$MOD_VERSION" >> $GITHUB_ENV
+          echo "UNPREFIXED_TAG=v${MOD_VERSION}" >> $GITHUB_ENV
           echo "MODRINTH_VERSION=$MODRINTH_VERSION" >> $GITHUB_ENV
-          echo "GAME_VERSIONS=$DEFAULT_GAME_VERSION" >> $GITHUB_ENV
+          echo "VERSION_TYPE=$VERSION_TYPE" >> $GITHUB_ENV
+          echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
+          echo "GAME_VERSIONS=$GAME_VERSION" >> $GITHUB_ENV
 
       - name: Generate changelog from commits
         run: |
@@ -45,7 +56,6 @@ jobs:
           else
             COMMIT_RANGE="HEAD"
           fi
-          # 生成 changelog 的脚本（与之前类似，可复用）
           python3 << EOF
           import subprocess, re
           from collections import defaultdict

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Show My Item is a server-side Fabric mod for Minecraft 1.21.4 that allows players to share their held item, inventory, or ender chest in chat using placeholders like `[item]`, `[inventory]`, or `[enderchest]`. Other players can hover to see tooltips or click links to view read-only inventory snapshots. The mod requires no client-side installation.
+Show My Item is a server-side Fabric mod for Minecraft 1.21.6 that allows players to share their held item, inventory, or ender chest in chat using placeholders like `[item]`, `[inventory]`, or `[enderchest]`. Other players can hover to see tooltips or click links to view read-only inventory snapshots. The mod requires no client-side installation.
 
 ## Build & Run
 
@@ -16,7 +16,7 @@ Show My Item is a server-side Fabric mod for Minecraft 1.21.4 that allows player
 ./gradlew clean build
 ```
 
-The Gradle properties are in `gradle.properties`: Minecraft 1.21.4, Fabric Loader 0.16.10, Fabric API 0.119.4, Java 21. The entrypoint is `com.PhantomPixel0418.showmyitem.Showmyitem`.
+The Gradle properties are in `gradle.properties`: Minecraft 1.21.6, Fabric Loader 0.16.14, Fabric API 0.128.2, Java 21. The entrypoint is `com.PhantomPixel0418.showmyitem.Showmyitem`.
 
 ## Architecture
 

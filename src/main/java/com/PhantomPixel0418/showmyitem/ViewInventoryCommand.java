@@ -320,7 +320,9 @@ public class ViewInventoryCommand {
         ItemStack[] shulkerItems = snapshot.getItems();
         SimpleInventory inv = new SimpleInventory(ENDER_CHEST_SIZE);
         for (int i = 0; i < ENDER_CHEST_SIZE; i++) {
-            inv.setStack(i, shulkerItems[i].copy());
+            if (shulkerItems[i] != null) {
+                inv.setStack(i, shulkerItems[i].copy());
+            }
         }
         String playerName = snapshot.getPlayerName();
         Text title = Text.literal(I18n.translate(player, "text.showmyitem.shulkerbox_title", playerName));

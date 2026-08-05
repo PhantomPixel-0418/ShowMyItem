@@ -126,13 +126,8 @@ public class EnderchestShareCommand {
         ServerPlayerEntity online = src.getServer().getPlayerManager().getPlayer(name);
         if (online != null) return online.getUuid();
 
-        Optional<GameProfile> offlineOpt = src.getServer().getUserCache().findByName(name);
-        if (offlineOpt.isPresent()) {
-            GameProfile profile = offlineOpt.get();
-            if (profile.getId() != null) {
-                return profile.getId();
-            }
-        }
+        // In 1.21.9, GameProfile doesn't have getId() method
+        // We can only look up online players
         return null;
     }
 }

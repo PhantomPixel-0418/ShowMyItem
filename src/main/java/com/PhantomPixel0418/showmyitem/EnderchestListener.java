@@ -20,7 +20,7 @@ public class EnderchestListener {
                     UUID inviterId = manager.findInviter(playerId);
                     if (inviterId != null) {
                         if (!(player instanceof ServerPlayerEntity serverPlayer)) return ActionResult.PASS;
-                        ServerPlayerEntity inviter = serverPlayer.getServer().getPlayerManager().getPlayer(inviterId);
+                        ServerPlayerEntity inviter = world.getServer().getPlayerManager().getPlayer(inviterId);
                         if (inviter != null) {
                             openEnderChestForPlayer(serverPlayer, inviter);
                         } else {

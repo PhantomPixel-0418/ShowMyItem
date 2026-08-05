@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import me.lucko.fabric.api.permissions.v0.Permissions;
 
 public class ViewInventoryCommand {
     private static final int COMBINED_INVENTORY_SIZE = 41;
@@ -43,7 +44,8 @@ public class ViewInventoryCommand {
             source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.snapshot_expired", minutes)));
             return 0;
         }
-        if (!player.getUuid().equals(snapshot.getCreatorUUID()) && !player.hasPermissionLevel(2)) {
+        // Check if player is creator or has admin permission
+        if (!player.getUuid().equals(snapshot.getCreatorUUID()) && !Permissions.check(player, "minecraft.op")) {
             source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.not_creator")));
             return 0;
         }
@@ -76,11 +78,11 @@ public class ViewInventoryCommand {
                         )
                 )
                 .then(CommandManager.literal("reloadconfig")
-                        .requires(source -> source.hasPermissionLevel(2))
+                        .requires(source -> Permissions.check(source, "minecraft.op"))
                         .executes(ViewInventoryCommand::reloadConfig)
                 )
                 .then(CommandManager.literal("set")
-                        .requires(source -> source.hasPermissionLevel(2))
+                        .requires(source -> Permissions.check(source, "minecraft.op"))
                         .then(CommandManager.argument("key", StringArgumentType.word())
                                 .then(CommandManager.argument("value", StringArgumentType.greedyString())
                                         .executes(ViewInventoryCommand::setConfig)

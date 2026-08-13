@@ -6,7 +6,6 @@ import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.minecraft.command.CommandRegistryAccess;
-import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -25,8 +24,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 public class ViewInventoryCommand {
-    private static final int COMBINED_INVENTORY_SIZE = 41;
+    private static final int COMBINED_INVENTORY_SIZE = 45;
     private static final int ENDER_CHEST_SIZE = 27;
+    private static final int MAIN_INVENTORY_SIZE = 36;
+    private static final int ARMOR_SLOT_COUNT = 4;
     private static final long MIN_SNAPSHOT_EXPIRY_MS = 1000;
 
     private static final Map<String, List<String>> CATEGORIES = new LinkedHashMap<>();
@@ -250,7 +251,7 @@ public class ViewInventoryCommand {
         return line;
     }
 
-    // ---------- Inventory View (41 slots) ----------
+    // ---------- Inventory View (45 slots) ----------
     private static int viewInventory(CommandContext<ServerCommandSource> context) {
         String snapshotIdStr = StringArgumentType.getString(context, "snapshot");
         ServerCommandSource source = context.getSource();
@@ -276,23 +277,36 @@ public class ViewInventoryCommand {
             return view27Slots(snapshotIdStr, snapshot, player, source, type);
         }
 
-        // INVENTORY type — 41 slots
+        // Layout: 5 rows × 9 = 45 slots
+        // Row 1: armor (helmet/chestplate/leggings/boots) + empty + offhand
+        // Rows 2-4: main inventory (slots 9-35, skipping hotbar indices 0-8)
+        // Row 5: creator's hotbar (mainItems[0..8] → combined slots 36-44)
         ItemStack[] mainItems = snapshot.getItems();
         ItemStack[] armorItems = snapshot.getArmor();
         ItemStack offhandItem = snapshot.getOffhand();
 
-        SimpleInventory combinedInventory = new SimpleInventory(COMBINED_INVENTORY_SIZE);
-        for (int i = 0; i < InventorySnapshot.MAIN_INVENTORY_SLOTS; i++) {
-            combinedInventory.setStack(i, mainItems[i].copy());
+        ItemStack[] combined = new ItemStack[COMBINED_INVENTORY_SIZE];
+        Arrays.fill(combined, ItemStack.EMPTY);
+        // Row 0: armor in reverse order (helmet→chestplate→leggings→boots), offhand at slot 8
+        for (int i = 0; i < 4; i++) {
+            combined[i] = armorItems[3 - i].copy();
         }
-        for (int i = 0; i < InventorySnapshot.ARMOR_SLOTS; i++) {
-            combinedInventory.setStack(InventorySnapshot.MAIN_INVENTORY_SLOTS + i, armorItems[i].copy());
+        combined[8] = offhandItem.copy();
+        // Rows 1-3: main inventory excluding hotbar (27 slots, indices 9-35)
+        for (int i = 9; i < MAIN_INVENTORY_SIZE; i++) {
+            combined[9 + (i - 9)] = mainItems[i].copy();
         }
-        combinedInventory.setStack(InventorySnapshot.OFFHAND_SLOT_INDEX, offhandItem.copy());
+        // Row 4: creator's hotbar (indices 0-8)
+        for (int i = 0; i < 9; i++) {
+            combined[36 + i] = mainItems[i].copy();
+        }
+        ReadOnlyInventory combinedInventory = new ReadOnlyInventory(combined);
 
         String playerName = snapshot.getPlayerName();
         Text title = Text.literal(I18n.translate(player, "text.showmyitem.inventory_title", playerName));
         InventoryUtils.openCustomInventoryScreen(player, combinedInventory, title);
+        // Ensure all container slots are synced to the client immediately
+        player.currentScreenHandler.sendContentUpdates();
         return 1;
     }
 
@@ -309,10 +323,7 @@ public class ViewInventoryCommand {
     private static int viewEnderChestDirect(String snapshotIdStr, InventorySnapshot snapshot,
                                              ServerPlayerEntity player, ServerCommandSource source) {
         ItemStack[] enderItems = snapshot.getItems();
-        SimpleInventory inv = new SimpleInventory(ENDER_CHEST_SIZE);
-        for (int i = 0; i < ENDER_CHEST_SIZE; i++) {
-            inv.setStack(i, enderItems[i].copy());
-        }
+        ReadOnlyInventory inv = new ReadOnlyInventory(enderItems);
         String playerName = snapshot.getPlayerName();
         Text title = Text.literal(I18n.translate(player, "text.showmyitem.enderchest_title", playerName));
         InventoryUtils.openCustomInventoryScreen(player, inv, title);
@@ -322,10 +333,7 @@ public class ViewInventoryCommand {
     private static int viewShulkerBoxDirect(String snapshotIdStr, InventorySnapshot snapshot,
                                              ServerPlayerEntity player, ServerCommandSource source) {
         ItemStack[] shulkerItems = snapshot.getItems();
-        SimpleInventory inv = new SimpleInventory(ENDER_CHEST_SIZE);
-        for (int i = 0; i < ENDER_CHEST_SIZE; i++) {
-            inv.setStack(i, shulkerItems[i].copy());
-        }
+        ReadOnlyInventory inv = new ReadOnlyInventory(shulkerItems);
         String playerName = snapshot.getPlayerName();
         Text title = Text.literal(I18n.translate(player, "text.showmyitem.shulkerbox_title", playerName));
         InventoryUtils.openCustomInventoryScreen(player, inv, title);

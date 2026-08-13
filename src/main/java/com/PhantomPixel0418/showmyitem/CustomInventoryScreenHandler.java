@@ -40,17 +40,7 @@ public class CustomInventoryScreenHandler extends ScreenHandler {
             }
         }
 
-        // Player inventory
-        int playerInvY = 18 + rows * 18 + 4;
-        for (int row = 0; row < 3; row++) {
-            for (int col = 0; col < 9; col++) {
-                this.addSlot(new Slot(playerInventory, col + row * 9 + 9, 8 + col * 18, playerInvY + row * 18));
-            }
-        }
-        int hotbarY = playerInvY + 58;
-        for (int col = 0; col < 9; col++) {
-            this.addSlot(new Slot(playerInventory, col, 8 + col * 18, hotbarY));
-        }
+        // All 5 rows (45 slots) rendered by the main loop above
     }
 
     private static final int SCREEN_HANDLER_MAX_9 = 9;

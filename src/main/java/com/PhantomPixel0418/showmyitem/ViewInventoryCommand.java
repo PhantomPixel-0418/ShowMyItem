@@ -305,37 +305,21 @@ public class ViewInventoryCommand {
         String playerName = snapshot.getPlayerName();
         Text title = Text.literal(I18n.translate(player, "text.showmyitem.inventory_title", playerName));
         InventoryUtils.openCustomInventoryScreen(player, combinedInventory, title);
-        // Ensure all container slots are synced to the client immediately
-        player.currentScreenHandler.sendContentUpdates();
         return 1;
     }
 
     private static int view27Slots(String snapshotIdStr, InventorySnapshot snapshot,
                                     ServerPlayerEntity player, ServerCommandSource source,
                                     InventorySnapshot.Type type) {
+        ItemStack[] items = snapshot.getItems();
+        ReadOnlyInventory inv = new ReadOnlyInventory(items);
+        String playerName = snapshot.getPlayerName();
+        Text title;
         if (type == InventorySnapshot.Type.ENDER_CHEST) {
-            return viewEnderChestDirect(snapshotIdStr, snapshot, player, source);
+            title = Text.literal(I18n.translate(player, "text.showmyitem.enderchest_title", playerName));
+        } else {
+            title = Text.literal(I18n.translate(player, "text.showmyitem.shulkerbox_title", playerName));
         }
-        // SHULKER_BOX
-        return viewShulkerBoxDirect(snapshotIdStr, snapshot, player, source);
-    }
-
-    private static int viewEnderChestDirect(String snapshotIdStr, InventorySnapshot snapshot,
-                                             ServerPlayerEntity player, ServerCommandSource source) {
-        ItemStack[] enderItems = snapshot.getItems();
-        ReadOnlyInventory inv = new ReadOnlyInventory(enderItems);
-        String playerName = snapshot.getPlayerName();
-        Text title = Text.literal(I18n.translate(player, "text.showmyitem.enderchest_title", playerName));
-        InventoryUtils.openCustomInventoryScreen(player, inv, title);
-        return 1;
-    }
-
-    private static int viewShulkerBoxDirect(String snapshotIdStr, InventorySnapshot snapshot,
-                                             ServerPlayerEntity player, ServerCommandSource source) {
-        ItemStack[] shulkerItems = snapshot.getItems();
-        ReadOnlyInventory inv = new ReadOnlyInventory(shulkerItems);
-        String playerName = snapshot.getPlayerName();
-        Text title = Text.literal(I18n.translate(player, "text.showmyitem.shulkerbox_title", playerName));
         InventoryUtils.openCustomInventoryScreen(player, inv, title);
         return 1;
     }

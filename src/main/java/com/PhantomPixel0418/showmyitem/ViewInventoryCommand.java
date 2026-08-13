@@ -43,10 +43,6 @@ public class ViewInventoryCommand {
             source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.snapshot_expired", minutes)));
             return 0;
         }
-        if (!player.getUuid().equals(snapshot.getCreatorUUID()) && !player.hasPermissionLevel(2)) {
-            source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.not_creator")));
-            return 0;
-        }
         return 1;
     }
 

@@ -12,7 +12,6 @@
   "text.showmyitem.invalid_snapshot": "Invalid snapshot ID",
   "text.showmyitem.snapshot_expired": "Inventory snapshot expired (%s minutes)",
   "text.showmyitem.config_reloaded": "ShowMyItem config reloaded",
-  "text.showmyitem.not_creator": "You don't have permission to view this inventory",
   "text.showmyitem.invalid_language": "Invalid language: %s (supported: en_us, zh_cn)",
   "text.showmyitem.unknown_key": "Unknown config key: %s",
   "text.showmyitem.set_success": "Set %s to %s",

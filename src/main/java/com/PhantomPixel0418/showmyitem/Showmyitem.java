@@ -18,7 +18,7 @@ import net.minecraft.util.Formatting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -178,8 +178,11 @@ public class Showmyitem implements ModInitializer {
     private Text createShulkerBoxComponent(ServerPlayerEntity player, ItemStack shulkerStack, ContainerComponent container) {
         List<ItemStack> stacks = container.stream().toList();
         ItemStack[] items = new ItemStack[27];
+        Arrays.fill(items, ItemStack.EMPTY);
         for (int i = 0; i < stacks.size() && i < 27; i++) {
-            items[i] = stacks.get(i).copy();
+            if (stacks.get(i) != null) {
+                items[i] = stacks.get(i).copy();
+            }
         }
 
         String playerName = player.getName().getString();

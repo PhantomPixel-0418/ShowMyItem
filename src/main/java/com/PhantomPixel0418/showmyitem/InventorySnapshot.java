@@ -11,7 +11,8 @@ public class InventorySnapshot {
     public enum Type {
         INVENTORY,
         ENDER_CHEST,
-        SHULKER_BOX
+        SHULKER_BOX,
+        HOTBAR
     }
 
     private final UUID id;

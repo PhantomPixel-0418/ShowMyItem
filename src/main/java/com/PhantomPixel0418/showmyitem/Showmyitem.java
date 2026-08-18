@@ -19,7 +19,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -58,6 +60,8 @@ public class Showmyitem implements ModInitializer {
             String rawText = message.getString();
 
             List<String> placeholders = I18n.getPlaceholders(player);
+            // Sort by length descending so "物品8" is tried before "物品"
+            placeholders.sort((a, b) -> b.length() - a.length());
 
             String regex = "\\[(" + placeholders.stream()
                     .map(Pattern::quote)
@@ -70,10 +74,11 @@ public class Showmyitem implements ModInitializer {
             int lastEnd = 0;
             matcher.reset();
 
-            String itemPlace = I18n.translate(player, "placeholder.item").toLowerCase();
-            String offhandPlace = I18n.translate(player, "placeholder.offhand").toLowerCase();
-            String inventoryPlace = I18n.translate(player, "placeholder.inventory").toLowerCase();
-            String enderPlace = I18n.translate(player, "placeholder.enderchest").toLowerCase();
+            Set<String> itemPlaces = I18n.getAllTranslations("placeholder.item");
+            Set<String> offhandPlaces = I18n.getAllTranslations("placeholder.offhand");
+            Set<String> inventoryPlaces = I18n.getAllTranslations("placeholder.inventory");
+            Set<String> enderPlaces = I18n.getAllTranslations("placeholder.enderchest");
+            Set<String> hotbarPlaces = I18n.getAllTranslations("placeholder.hotbar");
 
             while (matcher.find()) {
                 if (matcher.start() > lastEnd) {
@@ -82,11 +87,13 @@ public class Showmyitem implements ModInitializer {
                 }
 
                 String placeholder = matcher.group(1).toLowerCase();
-                if (placeholder.equals("item") || placeholder.equals(itemPlace)) {
+                if (placeholder.equals("item") || itemPlaces.contains(placeholder)) {
+                    // [item] / [物品] — current main hand item
                     result.append(createItemComponent(player.getMainHandStack(), player));
-                } else if (placeholder.equals("offhand") || placeholder.equals(offhandPlace)) {
+                } else if (placeholder.equals("offhand") || offhandPlaces.contains(placeholder)) {
                     result.append(createItemComponent(player.getOffHandStack(), player));
-                } else if (placeholder.equals("inventory") || placeholder.equals(inventoryPlace) || placeholder.equals("背包")) {
+                } else if (placeholder.equals("inventory") || inventoryPlaces.contains(placeholder)) {
+                    // [inventory] / [背包] — full inventory snapshot
                     ItemStack[] inventory = new ItemStack[MAIN_INVENTORY_SIZE];
                     for (int i = 0; i < MAIN_INVENTORY_SIZE; i++) {
                         inventory[i] = player.getInventory().getStack(i).copy();
@@ -96,23 +103,50 @@ public class Showmyitem implements ModInitializer {
                         armor[i] = player.getInventory().getArmorStack(i).copy();
                     }
                     ItemStack offhand = player.getOffHandStack().copy();
-
                     String playerName = player.getName().getString();
                     UUID snapshotId = InventorySnapshotManager.storeSnapshot(
                             inventory, armor, offhand, playerName, player.getUuid());
                     result.append(createInventoryComponent(player, snapshotId));
-                } else if (placeholder.equals("enderchest") || placeholder.equals(enderPlace) || placeholder.equals("末影箱")) {
+                } else if (placeholder.equals("enderchest") || enderPlaces.contains(placeholder)) {
+                    // [enderchest] / [末影箱] — ender chest snapshot
                     SimpleInventory tempEnder = InventoryUtils.copyEnderChest(player.getEnderChestInventory());
                     ItemStack[] enderItems = new ItemStack[tempEnder.size()];
                     for (int i = 0; i < enderItems.length; i++) {
                         enderItems[i] = tempEnder.getStack(i);
                     }
-
                     String playerName = player.getName().getString();
                     UUID snapshotId = InventorySnapshotManager.storeSnapshot(
                             enderItems, new ItemStack[0], ItemStack.EMPTY,
                             playerName, player.getUuid());
                     result.append(createEnderChestComponent(player, snapshotId));
+                } else if (!placeholder.startsWith("hotbar") && !placeholder.startsWith("快捷栏")) {
+                    // [itemN] / [物品N] — specific slot (0-8)
+                    String prefix = itemPlaces.stream().filter(p -> placeholder.startsWith(p)).reduce((a,b) -> a.length() > b.length() ? a : b).orElse(null);
+                    if (prefix != null && placeholder.length() > prefix.length()) {
+                        try {
+                            int slot = Integer.parseInt(placeholder.substring(prefix.length()));
+                            if (slot >= 0 && slot <= 8) {
+                                result.append(createItemComponent(player.getInventory().getStack(slot), player));
+                            } else {
+                                result.append(Text.literal("[" + placeholder + "]"));
+                            }
+                        } catch (NumberFormatException e) {
+                            result.append(Text.literal("[" + placeholder + "]"));
+                        }
+                    } else {
+                        result.append(Text.literal("[" + placeholder + "]"));
+                    }
+                } else if (placeholder.equals("hotbar") || hotbarPlaces.contains(placeholder)) {
+                    // [hotbar] — send hotbar snapshot link
+                    ItemStack[] hotbarItems = new ItemStack[9];
+                    for (int i = 0; i < 9; i++) {
+                        hotbarItems[i] = player.getInventory().getStack(i).copy();
+                    }
+                    String playerName = player.getName().getString();
+                    UUID snapshotId = InventorySnapshotManager.storeSnapshot(
+                            hotbarItems, new ItemStack[0], ItemStack.EMPTY, playerName, player.getUuid(),
+                            InventorySnapshot.Type.HOTBAR);
+                    result.append(createHotbarComponent(player, snapshotId));
                 } else {
                     result.append(Text.literal("[" + placeholder + "]"));
                 }
@@ -244,6 +278,19 @@ public class Showmyitem implements ModInitializer {
                 .setStyle(Style.EMPTY
                         .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
                                 "/showmyitem viewender " + snapshotId.toString()))
+                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                Text.literal(hoverText))));
+    }
+
+    private Text createHotbarComponent(ServerPlayerEntity player, UUID snapshotId) {
+        String playerName = player.getName().getString();
+        String linkText = I18n.translate(player, "text.showmyitem.hotbar_link", playerName);
+        String hoverText = I18n.translate(player, "text.showmyitem.hotbar_hover");
+
+        return Text.literal(linkText)
+                .setStyle(Style.EMPTY
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
+                                "/showmyitem viewinv " + snapshotId.toString()))
                         .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
                                 Text.literal(hoverText))));
     }

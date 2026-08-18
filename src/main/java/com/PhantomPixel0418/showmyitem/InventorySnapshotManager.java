@@ -12,6 +12,11 @@ public class InventorySnapshotManager {
 
     public static UUID storeSnapshot(ItemStack[] inventory, ItemStack[] armor, ItemStack offhand,
                                      String playerName, UUID creatorUUID) {
+        return storeSnapshot(inventory, armor, offhand, playerName, creatorUUID, InventorySnapshot.Type.INVENTORY);
+    }
+
+    public static UUID storeSnapshot(ItemStack[] inventory, ItemStack[] armor, ItemStack offhand,
+                                     String playerName, UUID creatorUUID, InventorySnapshot.Type type) {
         ModConfig config = ModConfig.getInstance();
         synchronized (SNAPSHOTS) {
             if (SNAPSHOTS.size() >= config.maxSnapshots) {
@@ -28,7 +33,7 @@ public class InventorySnapshotManager {
                     CREATION_ORDER.remove(oldestId);
                 }
             }
-            InventorySnapshot snapshot = new InventorySnapshot(inventory, armor, offhand, playerName, creatorUUID);
+            InventorySnapshot snapshot = new InventorySnapshot(inventory, armor, offhand, playerName, creatorUUID, type);
             SNAPSHOTS.put(snapshot.getId(), snapshot);
             CREATION_ORDER.add(snapshot.getId());
             return snapshot.getId();

@@ -32,5 +32,9 @@
   "placeholder.item": "物品",
   "placeholder.offhand": "副手",
   "placeholder.inventory": "背包",
-  "placeholder.enderchest": "末影箱"
+  "placeholder.enderchest": "末影箱",
+  "placeholder.hotbar": "快捷栏",
+  "text.showmyitem.hotbar_link": "[%s 的快捷栏]",
+  "text.showmyitem.hotbar_hover": "点击查看快捷栏",
+  "text.showmyitem.hotbar_title": "%s 的快捷栏"
 }

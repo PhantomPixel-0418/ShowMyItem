@@ -276,6 +276,9 @@ public class ViewInventoryCommand {
         if (type == InventorySnapshot.Type.ENDER_CHEST || type == InventorySnapshot.Type.SHULKER_BOX) {
             return view27Slots(snapshotIdStr, snapshot, player, source, type);
         }
+        if (type == InventorySnapshot.Type.HOTBAR) {
+            return viewHotbarSlots(snapshotIdStr, snapshot, player, source);
+        }
 
         // Layout: 5 rows × 9 = 45 slots
         // Row 1: armor (helmet/chestplate/leggings/boots) + empty + offhand
@@ -288,16 +291,16 @@ public class ViewInventoryCommand {
         ItemStack[] combined = new ItemStack[COMBINED_INVENTORY_SIZE];
         Arrays.fill(combined, ItemStack.EMPTY);
         // Row 0: armor in reverse order (helmet→chestplate→leggings→boots), offhand at slot 8
-        for (int i = 0; i < 4; i++) {
-            combined[i] = armorItems[3 - i].copy();
+        for (int i = 0; i < 4 && i < armorItems.length; i++) {
+            combined[i] = armorItems[Math.max(0, 3 - i)].copy();
         }
-        combined[8] = offhandItem.copy();
+        if (offhandItem != null) combined[8] = offhandItem.copy();
         // Rows 1-3: main inventory excluding hotbar (27 slots, indices 9-35)
-        for (int i = 9; i < MAIN_INVENTORY_SIZE; i++) {
+        for (int i = 9; i < MAIN_INVENTORY_SIZE && i < mainItems.length; i++) {
             combined[9 + (i - 9)] = mainItems[i].copy();
         }
         // Row 4: creator's hotbar (indices 0-8)
-        for (int i = 0; i < 9; i++) {
+        for (int i = 0; i < 9 && i < mainItems.length; i++) {
             combined[36 + i] = mainItems[i].copy();
         }
         ReadOnlyInventory combinedInventory = new ReadOnlyInventory(combined);
@@ -320,6 +323,16 @@ public class ViewInventoryCommand {
         } else {
             title = Text.literal(I18n.translate(player, "text.showmyitem.shulkerbox_title", playerName));
         }
+        InventoryUtils.openCustomInventoryScreen(player, inv, title);
+        return 1;
+    }
+
+    private static int viewHotbarSlots(String snapshotIdStr, InventorySnapshot snapshot,
+                                       ServerPlayerEntity player, ServerCommandSource source) {
+        ItemStack[] items = snapshot.getItems();
+        ReadOnlyInventory inv = new ReadOnlyInventory(items);
+        String playerName = snapshot.getPlayerName();
+        Text title = Text.literal(I18n.translate(player, "text.showmyitem.hotbar_title", playerName));
         InventoryUtils.openCustomInventoryScreen(player, inv, title);
         return 1;
     }

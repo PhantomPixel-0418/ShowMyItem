@@ -32,5 +32,9 @@
   "placeholder.item": "item",
   "placeholder.offhand": "offhand",
   "placeholder.inventory": "inventory",
-  "placeholder.enderchest": "enderchest"
+  "placeholder.enderchest": "enderchest",
+  "placeholder.hotbar": "hotbar",
+  "text.showmyitem.hotbar_link": "[%s's Hotbar]",
+  "text.showmyitem.hotbar_hover": "Click to view hotbar",
+  "text.showmyitem.hotbar_title": "%s's Hotbar"
 }

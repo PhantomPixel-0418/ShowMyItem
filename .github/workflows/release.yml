@@ -1,4 +1,4 @@
-name: Publish Release
+﻿name: Publish Release
 
 permissions:
   contents: write
@@ -20,18 +20,37 @@ jobs:
       - name: Set version variables
         run: |
           TAG_NAME=${GITHUB_REF_NAME}
-          MOD_VERSION=${TAG_NAME#v}
-          echo "MOD_VERSION=$MOD_VERSION" >> $GITHUB_ENV
-          echo "UNPREFIXED_TAG=$MOD_VERSION" >> $GITHUB_ENV
-          echo "VERSION_TYPE=release" >> $GITHUB_ENV
-          RELEASE_NAME="Show My Item v${MOD_VERSION}"
-          echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
+          RAW_VERSION="${TAG_NAME#v}"
 
-          # 默认游戏版本（可通过 commit message 覆盖，但简单起见固定）
-          DEFAULT_GAME_VERSION="1.21.4"
-          MODRINTH_VERSION="${MOD_VERSION}+${DEFAULT_GAME_VERSION}fabric"
+          if [[ "$RAW_VERSION" == *"+"* ]]; then
+            GAME_VERSION="${RAW_VERSION##*+}"
+            MOD_VERSION="${RAW_VERSION%%+*}"
+          else
+            GAME_VERSION=$(grep 'minecraft_version' gradle.properties | cut -d= -f2- | tr -d '[:space:]')
+            MOD_VERSION="$RAW_VERSION"
+          fi
+
+          MODRINTH_VERSION="${MOD_VERSION}+${GAME_VERSION}fabric"
+          VERSION_TYPE=release
+          RELEASE_NAME="Show My Item v${MOD_VERSION}"
+
+          echo "MOD_VERSION=$MOD_VERSION" >> $GITHUB_ENV
+          echo "UNPREFIXED_TAG=v${MOD_VERSION}" >> $GITHUB_ENV
           echo "MODRINTH_VERSION=$MODRINTH_VERSION" >> $GITHUB_ENV
-          echo "GAME_VERSIONS=$DEFAULT_GAME_VERSION" >> $GITHUB_ENV
+          echo "VERSION_TYPE=$VERSION_TYPE" >> $GITHUB_ENV
+          echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_ENV
+          echo "GAME_VERSIONS=$GAME_VERSION" >> $GITHUB_ENV
+
+      - name: Check for existing GitHub Release
+        run: |
+          EXISTING_RELEASE=$(gh release list --json tagName,name | jq -r ".[] | select(.name == \"${{ env.RELEASE_NAME }}\") | .tagName")
+          if [ -n "$EXISTING_RELEASE" ]; then
+            echo "Release ${{ env.RELEASE_NAME }} already exists on tag $EXISTING_RELEASE"
+            echo "EXISTING_RELEASE=$EXISTING_RELEASE" >> $GITHUB_ENV
+          else
+            echo "No existing release found for ${{ env.RELEASE_NAME }}"
+            echo "EXISTING_RELEASE=" >> $GITHUB_ENV
+          fi
 
       - name: Generate changelog from commits
         run: |
@@ -45,8 +64,7 @@ jobs:
           else
             COMMIT_RANGE="HEAD"
           fi
-          # 生成 changelog 的脚本（与之前类似，可复用）
-          python3 << EOF
+          python3 << 'PYEOF'
           import subprocess, re
           from collections import defaultdict
 
@@ -57,38 +75,35 @@ jobs:
           categories = {
               'feat': ('✨ 新功能', []),
               'fix': ('🐛 Bug 修复', []),
-              'docs': ('📝 文档', []),
-              'refactor': ('♻️ 重构', []),
               'perf': ('⚡ 性能优化', []),
-              'chore': ('🔧 杂务', []),
+              'refactor': ('♻️ 重构', []),
+              'docs': ('📝 文档', []),
+              'build': ('🔨 构建', []),
+              'ci': ('🤖 CI/CD', []),
+              'test': ('🧪 测试', []),
+              'chore': ('🧹 杂项', []),
           }
-          other = []
 
-          for msg, author in commits:
-              m = re.match(r'^([a-z]+)(?:\([^)]+\))?:\s*(.*)', msg)
-              if m:
-                  typ, rest = m.groups()
-              else:
-                  typ, rest = None, msg
-              entry = f"- {rest} by **@{author}**"
-              if typ and typ in categories:
-                  categories[typ][1].append(entry)
-              else:
-                  other.append(entry)
+          for commit_msg, author in commits:
+              matched = False
+              for prefix, (label, lst) in categories.items():
+                  if commit_msg.lower().startswith(prefix + ':') or commit_msg.lower().startswith(prefix + '('):
+                      lst.append(f'- {commit_msg}')
+                      matched = True
+                      break
+              if not matched:
+                  categories['chore'][1].append(f'- {commit_msg}')
 
-          changelog = f"## Changes in ${{ env.MOD_VERSION }}\n\n"
-          for typ, (title, entries) in categories.items():
-              if entries:
-                  changelog += f"### {title}\n" + "\n".join(entries) + "\n\n"
-          if other:
-              changelog += "### 📌 其他\n" + "\n".join(other) + "\n\n"
-          if not changelog.strip():
-              changelog = "## No changes recorded"
-
-          with open('changelog.md', 'w') as f:
+          lines = []
+          for label, commits in categories.items():
+              if commits:
+                  lines.append(f"\n### {label}\n")
+                  lines.extend(commits)
+          changelog = '\n'.join(lines)
+          with open('changelog.md', 'w', encoding='utf-8') as f:
               f.write(changelog)
-          EOF
-        shell: bash
+          print(changelog)
+          PYEOF
 
       - name: Cache Gradle packages
         uses: actions/cache@v3
@@ -120,27 +135,49 @@ jobs:
           cp "$FINAL_JAR" "build/libs/$NEW_NAME"
           echo "RELEASE_JAR=build/libs/$NEW_NAME" >> $GITHUB_ENV
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ env.RELEASE_NAME }}
-          body_path: changelog.md
-          draft: false
-          prerelease: false
-          files: ${{ env.RELEASE_JAR }}
+      - name: Create or update GitHub Release
+        run: |
+          if [ -n "$EXISTING_RELEASE" ]; then
+            gh release edit "$EXISTING_RELEASE" \
+              --title "${{ env.RELEASE_NAME }}" \
+              --notes-file changelog.md
+          else
+            gh release create "${{ github.ref_name }}" \
+              --title "${{ env.RELEASE_NAME }}" \
+              --notes-file changelog.md \
+              --generate-notes
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload to Modrinth
-        uses: cloudnode-pro/modrinth-publish@v2
-        with:
-          token: ${{ secrets.MODRINTH_TOKEN }}
-          project: "pMKJZtiq"
-          name: ${{ env.RELEASE_NAME }}
-          version: ${{ env.MODRINTH_VERSION }}
-          version-type: ${{ env.VERSION_TYPE }}
-          changelog-file: ${{ github.workspace }}/changelog.md
-          loaders: fabric
-          game-versions: ${{ env.GAME_VERSIONS }}
-          files: ${{ env.RELEASE_JAR }}
+        run: |
+          EXISTING_MODRINTH=$(curl -s "https://api.modrinth.com/v1/project/pMKJZtiq/version/${{ env.MODRINTH_VERSION }}" | jq -r '.id // empty')
+          if [ -n "$EXISTING_MODRINTH" ]; then
+            echo "Modrinth version ${{ env.MODRINTH_VERSION }} already exists"
+            echo "EXISTING_MODRINTH=$EXISTING_MODRINTH" >> $GITHUB_ENV
+          else
+            echo "No existing Modrinth version found"
+            echo "EXISTING_MODRINTH=" >> $GITHUB_ENV
+          fi
+
+          if [ -z "$EXISTING_MODRINTH" ]; then
+            CHANGELOG=$(cat changelog.md | sed 's/"/\\"/g' | tr '\n' '\a' | sed 's/\a/\\n/g')
+            curl -s -X POST "https://api.modrinth.com/v1/project/pMKJZtiq/version" \
+              -H "Authorization: ${{ secrets.MODRINTH_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"name\": \"${{ env.RELEASE_NAME }}\",
+                \"version_number\": \"${{ env.MODRINTH_VERSION }}\",
+                \"version_type\": \"${{ env.VERSION_TYPE }}\",
+                \"changelog\": \"$CHANGELOG\",
+                \"game_versions\": [\"${{ env.GAME_VERSIONS }}\"],
+                \"loaders\": [\"fabric\"],
+                \"files\": [{
+                  \"path\": \"${{ env.RELEASE_JAR }}\",
+                  \"primary\": true
+                }]
+              }"
+          else
+            echo "Skipping Modrinth upload - version already exists"
+          fi

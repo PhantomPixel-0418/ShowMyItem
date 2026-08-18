@@ -1,4 +1,4 @@
-name: Publish Beta
+﻿name: Publish Beta
 
 permissions:
   contents: write
@@ -85,7 +85,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ env.UNPREFIXED_TAG }}
+          tag_name: v${{ env.MOD_VERSION }}
           name: ${{ env.RELEASE_NAME }}
           body_path: changelog.md
           draft: false
@@ -95,14 +95,31 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload to Modrinth
-        uses: cloudnode-pro/modrinth-publish@v2
-        with:
-          token: ${{ secrets.MODRINTH_TOKEN }}
-          project: "pMKJZtiq"
-          name: ${{ env.RELEASE_NAME }}
-          version: ${{ env.MODRINTH_VERSION }}
-          version-type: ${{ env.VERSION_TYPE }}
-          changelog-file: ${{ github.workspace }}/changelog.md
-          loaders: fabric
-          game-versions: ${{ env.GAME_VERSIONS }}
-          files: ${{ env.RELEASE_JAR }}
+        run: |
+          EXISTING_MODRINTH=$(curl -s "https://api.modrinth.com/v1/project/pMKJZtiq/version/${{ env.MODRINTH_VERSION }}" | jq -r '.id // empty')
+          if [ -n "$EXISTING_MODRINTH" ]; then
+            echo "Modrinth version ${{ env.MODRINTH_VERSION }} already exists, skipping upload"
+            echo "SKIP_MODRINTH=true" >> $GITHUB_ENV
+          else
+            echo "No existing Modrinth version found, uploading..."
+            echo "SKIP_MODRINTH=false" >> $GITHUB_ENV
+          fi
+
+          if [ "$SKIP_MODRINTH" != "true" ]; then
+            CHANGELOG=$(cat changelog.md | tr '\n' '\\' | sed 's/\\/\\n/g')
+            curl -s -X POST "https://api.modrinth.com/v1/project/pMKJZtiq/version" \
+              -H "Authorization: ${{ secrets.MODRINTH_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"name\": \"${{ env.RELEASE_NAME }}\",
+                \"version_number\": \"${{ env.MODRINTH_VERSION }}\",
+                \"version_type\": \"${{ env.VERSION_TYPE }}\",
+                \"changelog\": \"$CHANGELOG\",
+                \"game_versions\": [\"${{ env.GAME_VERSIONS }}\"],
+                \"loaders\": [\"fabric\"],
+                \"files\": [{
+                  \"path\": \"${{ env.RELEASE_JAR }}\",
+                  \"primary\": true
+                }]
+              }"
+          fi

@@ -44,11 +44,6 @@ public class ViewInventoryCommand {
             source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.snapshot_expired", minutes)));
             return 0;
         }
-        // Check if player is creator or has admin permission
-        if (!player.getUuid().equals(snapshot.getCreatorUUID()) && !Permissions.check(player, "minecraft.op")) {
-            source.sendError(Text.literal(I18n.translate(player, "text.showmyitem.not_creator")));
-            return 0;
-        }
         return 1;
     }
 

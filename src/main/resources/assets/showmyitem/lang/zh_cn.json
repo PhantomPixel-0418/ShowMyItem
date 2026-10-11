@@ -12,7 +12,6 @@
   "text.showmyitem.invalid_snapshot": "无效的快照ID",
   "text.showmyitem.snapshot_expired": "背包快照已过期（%s 分钟）",
   "text.showmyitem.config_reloaded": "ShowMyItem 配置已重新加载",
-  "text.showmyitem.not_creator": "你没有权限查看这个背包",
   "text.showmyitem.invalid_language": "无效的语言设置: %s (支持 en_us, zh_cn)",
   "text.showmyitem.unknown_key": "未知配置项: %s",
   "text.showmyitem.set_success": "已设置 %s 为 %s",
